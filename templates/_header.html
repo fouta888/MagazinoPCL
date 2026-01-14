@@ -44,6 +44,30 @@
         QR Login
       </a>
 
+
+      <!-- Menu messaggi -->
+      <div class="relative">
+        <!-- Icona messaggi -->
+        <a href="{{ url_for('messaggi') }}" class="text-gray-700 hover:text-indigo-500 relative">
+          <svg class="w-6 h-6 inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <!-- Badge messaggi non letti -->
+          {% set unread = inbox|selectattr('3','equalto',False)|list|length if inbox else 0 %}
+          {% if unread > 0 %}
+          <span class="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 inline-flex items-center justify-center 
+                   px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+            {{ unread }}
+          </span>
+          {% endif %}
+        </a>
+      </div>
+
+
+
+
+
       <div class="flex items-center space-x-2">
         <!-- Icona utente -->
         <svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
