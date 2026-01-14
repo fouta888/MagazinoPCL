@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto p-6">
+  <h1 class="text-3xl font-bold mb-8 text-gray-800">Modifica Movimento</h1>
+
+  <form method="POST" class="bg-white shadow-md rounded-2xl p-6 space-y-6">
+
+    <!-- GRID: 2 colonne su md -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Nome Prodotto -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Nome Prodotto</label>
+        <input type="text" name="nome" value="{{ movimento.nome_prodotto }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      <!-- Categoria -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Categoria</label>
+        <select name="categoria_id"
+                class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+                {% if not is_admin %}disabled{% endif %}>
+          {% for c in categorie %}
+          <option value="{{ c[0] }}" {% if c[0] == movimento.categoria_id %}selected{% endif %}>
+            {{ c[1] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Misura -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Misura</label>
+        <input type="text" name="misura" value="{{ movimento.misura }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      <!-- Posizione -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Posizione</label>
+        <input type="text" name="posizione" value="{{ movimento.posizione }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      <!-- Tipo Movimento (sempre disabilitato) -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Tipo Movimento</label>
+        <input type="text" value="{{ movimento.tipo }}"
+               class="border border-gray-300 rounded-lg p-3 bg-gray-100" disabled>
+      </div>
+
+      <!-- Quantità -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Quantità</label>
+        <input type="number" name="quantita" value="{{ movimento.quantita }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      <!-- Data Movimento -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Data Movimento</label>
+        <input type="date" name="data_movimento" value="{{ movimento.data }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      {% if movimento.tipo == "entrata" %}
+      <!-- Data Scadenza -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Data Scadenza</label>
+        <input type="date" name="data_scadenza" value="{{ movimento.scadenza }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Pulsanti -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+      {% if is_admin %}
+      <button type="submit" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-700 transition">
+        Salva Modifiche
+      </button>
+      {% else %}
+      <p class="text-sm text-gray-500 italic mt-2">
+        Solo gli amministratori possono modificare i movimenti.
+      </p>
+      {% endif %}
+
+      <a href="{{ url_for('movimenti_view') }}" class="text-gray-600 hover:text-gray-800 font-medium transition">
+        Torna indietro
+      </a>
+    </div>
+
+  </form>
+</div>
+
+{% endblock %}
+

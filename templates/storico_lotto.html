@@ -1,0 +1,24 @@
+<h2 class="text-xl font-bold mb-4">Storico Movimenti Lotto</h2>
+
+<table class="w-full text-sm text-left table-auto">
+    <thead class="bg-gray-100">
+        <tr>
+            <th class="px-4 py-2">ID</th>
+            <th class="px-4 py-2">Prodotto</th>
+            <th class="px-4 py-2">Tipo</th>
+            <th class="px-4 py-2">Quantità</th>
+            <th class="px-4 py-2">Data</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in movimenti %}
+        <tr class="border-b">
+            <td class="px-4 py-2">{{ m[0] }}</td>
+            <td class="px-4 py-2">{{ m[4] }}</td>
+            <td class="px-4 py-2">{{ m[1] }}</td>
+            <td class="px-4 py-2">{{ m[2] }}</td>
+            <td class="px-4 py-2">{{ m[3] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

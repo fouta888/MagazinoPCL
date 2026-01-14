@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Utenti</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-blue-800">
+  {% include "_header.html" %}
+
+  <main class="max-w-5xl mx-auto p-2 space-y-6">
+
+    <h1 class="text-3xl font-bold text-yellow-400">Gestione Utenti</h1>
+
+    {% if session['ruolo'] == 'Amministratore' %}
+    <section class="bg-white p-6 rounded-xl shadow-md space-y-4">
+      <h2 class="text-xl font-semibold">Aggiungi Nuovo Utente</h2>
+      <form method="POST" class="space-y-3">
+        <input type="text" name="username" placeholder="Username" required class="w-full border p-2 rounded-lg" />
+        <input type="password" name="password" placeholder="Password" required class="w-full border p-2 rounded-lg" />
+        <select name="ruolo" required class="w-full border p-2 rounded-lg">
+          {% for r in ruoli %}
+          <option value="{{ r[0] }}">{{ r[1] }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Aggiungi</button>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="bg-white p-6 rounded-xl shadow-md space-y-4">
+      <h2 class="text-xl font-semibold">Utenti Esistenti</h2>
+      <table class="min-w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-200 text-left">
+            <th class="p-2 border">ID</th>
+            <th class="p-2 border">Username</th>
+            <th class="p-2 border">Ruolo</th>
+            <th class="p-2 border">Attivo</th>
+            {% if session['ruolo'] in ['Amministratore', 'Manager'] %}
+            <th class="p-2 border">Azioni</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in utenti %}
+          <tr class="border-t">
+            <td class="p-2 border">{{ u[0] }}</td>
+            <td class="p-2 border">{{ u[1] }}</td>
+            <td class="p-2 border">{{ u[2] }}</td>
+            <td class="p-2 border">{{ 'Sì' if u[3] else 'No' }}</td>
+            {% if session['ruolo'] in ['Amministratore', 'Manager'] %}
+            <td class="p-2 border space-x-2">
+              <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}"
+                class="text-blue-600 hover:underline">Modifica</a>
+              <a href="{{ url_for('elimina_utente', utente_id=u[0]) }}" class="text-red-600 hover:underline"
+                onclick="return confirm('Sei sicuro di voler eliminare questo utente?');">Elimina</a>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <div class="space-x-4 mt-4 p-2">
+      <a href="{{ url_for('dashboard') }}" class="text-white py-1 px-2 bg-gray-400 rounded-xl hover:text-red-600">Torna
+        alla Dashboard</a>
+      <a href="{{ url_for('logout') }}"
+        class="text-white py-1 px-4 bg-gray-400 rounded-xl hover:text-red-600">Logout</a>
+    </div>
+
+  </main>
+</body>
+
+</html>

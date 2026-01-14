@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-4 text-yellow-400">Gestione Lotti</h1>
+
+<!-- Filtro ricerca -->
+<div class="mb-4 flex flex-col lg:flex-row items-center gap-3">
+    <input id="searchInput" type="text" placeholder="🔍 Cerca lotti..."
+        class="flex-1 border border-gray-300 rounded-lg p-2 w-full" onkeyup="filterTable()" />
+
+    <div class="flex gap-2 flex-wrap justify-center">
+        <div class="relative group">
+            <button
+                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md">
+                🖨️ Stampa PDF
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+
+            <div
+                class="absolute hidden group-hover:block bg-white border shadow-2xl rounded-xl mt-1 z-50 min-w-[220px] right-0 lg:left-0">
+                <div class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b">Filtri Rapidi</div>
+                <a href="{{ url_for('esporta_pdf', tipo='tutti') }}" class="block px-4 py-2 hover:bg-blue-50">Tutti i
+                    movimenti</a>
+                <a href="{{ url_for('esporta_pdf', tipo='entrata') }}"
+                    class="block px-4 py-2 hover:bg-green-50 text-green-700 font-medium">Solo Entrate</a>
+                <a href="{{ url_for('esporta_pdf', tipo='uscita') }}"
+                    class="block px-4 py-2 hover:bg-red-50 text-red-700 font-medium border-b">Solo Uscite</a>
+
+                <div class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b">Archivio Annuale
+                </div>
+
+                {% if anni_report %}
+                {% for anno in anni_report %}
+                <a href="{{ url_for('esporta_pdf', tipo='tutti', anno=anno) }}"
+                    class="block px-4 py-2 hover:bg-gray-100">
+                    Report Anno {{ anno }}
+                </a>
+                {% endfor %}
+                {% else %}
+                <span class="block px-4 py-2 text-gray-400 italic text-sm">Nessun movimento registrato</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <a href="{{ url_for('carico_lotto') }}"
+            class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+            ➕ Aggiungi
+        </a>
+
+        <a href="{{ url_for('uscita_lotto') }}" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+            ➖ Scarico FIFO
+        </a>
+    </div>
+</div>
+
+<!-- Tabella lotti -->
+<div class="overflow-x-auto bg-white shadow rounded-lg border border-gray-200">
+    <table class="w-full text-sm text-left table-auto">
+        <thead class="bg-gray-100 border-b text-gray-700">
+            <tr>
+                <th class="px-6 py-3">ID</th>
+                <th class="px-6 py-3">Prodotto</th>
+                <th class="px-6 py-3">Quantità</th>
+                <th class="px-6 py-3">Data Scadenza</th>
+                <th class="px-6 py-3">Posizione</th>
+                <th class="px-6 py-3">Azioni</th>
+            </tr>
+        </thead>
+
+        <tbody class="divide-y text-gray-800">
+            {% for lotto in lotti %}
+            <tr {% if lotto[3] %} {% if lotto[3] < oggi %} class="bg-red-300 text-red-900 font-bold" {% elif lotto[3]
+                <=soglia_scadenza %} class="bg-yellow-200" {% endif %} {% endif %}>
+                <td class="px-6 py-3">{{ lotto[0] }}</td>
+                <td class="px-6 py-3">{{ lotto[1] }}</td>
+                <td class="px-6 py-3">{{ lotto[2] }}</td>
+                <td class="px-6 py-3">
+                    {{ lotto[3] if lotto[3] else "—" }}
+                </td>
+                <td class="px-6 py-3">{{ lotto[4] }}</td>
+                <td class="px-6 py-3 flex gap-2">
+                    {% if session.get("ruolo") == "Amministratore" %}
+                    <a href="{{ url_for('modifica_lotto', lotto_id=lotto[0]) }}"
+                        class="bg-blue-600 text-white px-3 py-1 rounded">✏️</a>
+                    <a href="{{ url_for('elimina_lotto', lotto_id=lotto[0]) }}"
+                        class="bg-red-600 text-white px-3 py-1 rounded">🗑️</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center py-4 text-gray-500">
+                    Nessun lotto disponibile
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+
+    </table>
+</div>
+
+<script src="{{ url_for('static', filename='search.js') }}"></script>
+
+{% endblock %}

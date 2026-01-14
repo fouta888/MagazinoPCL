@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+      background-color: #eef2f7;
+    }
+  </style>
+</head>
+
+<body class="bg-blue-800">
+  {% include "_header.html" %}
+
+  <main class="max-w-7xl mx-auto mt-2">
+    <h1 class="text-3xl font-bold text-yellow-400 mb-4">Prodotti Disponibili</h1>
+
+    <!-- Campo di ricerca e pulsanti -->
+    <div class="mb-4 flex flex-row items-center gap-3">
+      <input id="searchInput" type="text" placeholder="🔍 Cerca prodotti..."
+        class="flex-1 min-w-0 border border-gray-300 rounded-lg p-3 text-sm sm:text-base" onkeyup="filterTable()" />
+
+      {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+      <a href="{{ url_for('nuovo_prodotto') }}"
+        class="bg-neutral-500 text-slate-50 px-4 py-2 h-12 rounded-lg hover:bg-green-700 transition flex items-center gap-2 whitespace-nowrap">
+        ➕ Nuovo articolo
+      </a>
+      {% endif %}
+
+      {% if session.get("ruolo") == "Amministratore" %}
+      <a href="{{ url_for('prodotti_pdf') }}" target="_blank"
+        class="bg-green-600 text-white px-4 py-2 h-12 rounded-lg hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
+        <span>🖨️</span>
+        <span class="hidden sm:inline">Stampa PDF</span>
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Filtro scadenza -->
+    <div class="mb-4 flex flex-wrap gap-3 items-center">
+      <label class="flex items-center gap-2 text-white cursor-pointer">
+        <input type="checkbox" id="filterScadenza" class="w-4 h-4" onchange="filterScadenza()" />
+        <span class="text-sm sm:text-base">Mostra solo in scadenza</span>
+      </label>
+      <span class="text-sm text-red-300">(entro 30 giorni)</span>
+    </div>
+
+    <!-- Tabella prodotti -->
+    <div class="relative overflow-x-auto bg-white shadow rounded-lg border border-gray-200">
+      <table class="w-full text-sm text-left table-auto">
+        <thead class="text-gray-700 bg-gray-100 border-b">
+          <tr>
+            <th class="px-6 py-3 font-semibold">ID</th>
+            <th class="px-6 py-3 font-semibold">Nome</th>
+            <th class="px-6 py-3 font-semibold">Categoria</th>
+            <th class="px-6 py-3 font-semibold">Misura</th>
+            <th class="px-6 py-3 font-semibold">Quantità</th>
+            <th class="px-6 py-3 font-semibold">Scadenza</th>
+            <th class="px-6 py-3 font-semibold">Posizione</th>
+            {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+            <th class="px-6 py-3 font-semibold text-center">Note</th>
+            {% endif %}
+          </tr>
+        </thead>
+
+        <tbody class="text-gray-800 divide-y">
+          {% for prodotto in prodotti %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-3">{{ prodotto[0] }}</td>
+            <td class="px-6 py-3">{{ prodotto[1] }}</td>
+            <td class="px-6 py-3">{{ prodotto[2] or "—" }}</td>
+            <td class="px-6 py-3">{{ prodotto[3] or "—" }}</td>
+            <td class="px-6 py-3">{{ prodotto[4] }}</td>
+            <td class="px-6 py-3">{{ prodotto[5] or "—" }}</td>
+            <td class="px-6 py-3 flex items-center justify-between gap-2">
+              <span>{{ prodotto[6] or "—" }}</span>
+
+              {% if session.get("ruolo") == "Amministratore" %}
+              <a href="{{ url_for('modifica_prodotto', prodotto_id=prodotto[0]) }}"
+                class="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 transition whitespace-nowrap">
+                ✏️ Modifica
+              </a>
+              {% endif %}
+            </td>
+
+            {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+            <td class="px-6 py-3 text-center">
+              {% if prodotto[7] %}
+              <button type="button"
+                class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-600 btn-nota"
+                data-nota="{{ prodotto[7] if prodotto[7] is not none else '' }}" data-id="{{ prodotto[0] }}">
+                📄 Note
+              </button>
+
+
+              {% else %}
+              <span class="text-gray-400">—</span>
+              {% endif %}
+            </td>
+            {% endif %}
+
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{% if session.get('ruolo') in ['Amministratore','Manager'] %}8{% else %}7{% endif %}"
+              class="px-6 py-4 text-center text-gray-500">
+              Nessun prodotto disponibile.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- MODAL NOTE -->
+  <div id="noteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-lg max-w-lg w-full p-6">
+      <h2 class="text-lg font-bold mb-3">📄 Note prodotto</h2>
+
+      <textarea id="noteContent" class="w-full border border-gray-300 rounded p-2 h-32 text-sm"></textarea>
+
+      <div class="mt-4 flex justify-end gap-2">
+        <button onclick="closeNote()" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+          Chiudi
+        </button>
+        <button onclick="saveNote()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+          Salva
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <script>
+    let currentProdottoId = null;
+
+    function showNote(note, prodottoId) {
+      currentProdottoId = prodottoId;
+      document.getElementById("noteContent").value = note || "";
+      document.getElementById("noteModal").classList.remove("hidden");
+      document.getElementById("noteModal").classList.add("flex");
+    }
+
+    function closeNote() {
+      document.getElementById("noteModal").classList.add("hidden");
+      document.getElementById("noteModal").classList.remove("flex");
+      currentProdottoId = null;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      // Seleziona tutti i bottoni con la classe btn-nota
+      const bottoniNote = document.querySelectorAll('.btn-nota');
+
+      bottoniNote.forEach(bottone => {
+        bottone.addEventListener('click', function () {
+          // Recupera i dati dagli attributi data-
+          const nota = this.getAttribute('data-nota');
+          const id = this.getAttribute('data-id');
+
+          // Chiama la tua funzione originale
+          showNote(nota, id);
+        });
+      });
+    });
+
+    async function saveNote() {
+      const note = document.getElementById("noteContent").value;
+      if (!currentProdottoId) return;
+
+      const response = await fetch(`/prodotti/note/${currentProdottoId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note })
+      });
+
+      if (response.ok) {
+        alert("Nota salvata!");
+        closeNote();
+        location.reload();
+      } else {
+        alert("Errore nel salvataggio della nota.");
+      }
+    }
+  </script>
+
+
+
+  <script src="{{ url_for('static', filename='search.js') }}"></script>
+</body>
+
+</html>

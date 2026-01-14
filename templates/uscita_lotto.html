@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6 text-yellow-400">Scarico Magazzino (FIFO)</h1>
+
+<div class="min-h-[60vh] flex items-center justify-center px-2">
+
+    <form id="formScarico" method="POST"
+        class="bg-white p-8 rounded-xl shadow-lg space-y-4 w-full max-w-md border border-gray-100">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 text-center">Registra Scarico</h2>
+
+        <div>
+            <label class="font-semibold block mb-1 text-gray-700">Prodotto</label>
+            <select id="prodottoSelect" name="prodotto_id"
+                class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                required>
+                <option value="" disabled selected>Seleziona un prodotto...</option>
+                {% for p in prodotti %}
+                <option value="{{ p[0] }}" data-max="{{ p[2] }}">
+                    {{ p[1] }} (Disp: {{ p[2] }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="font-semibold block mb-1 text-gray-700">Quantità da scaricare</label>
+            <input type="number" id="inputQuantita" name="quantita" min="1"
+                class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                placeholder="Inserisci quantità" required>
+        </div>
+
+        <button type="submit"
+            class="bg-red-600 text-white px-4 py-3 rounded-lg font-bold hover:bg-red-700 transition w-full shadow-md shadow-red-100">
+            Conferma Scarico
+        </button>
+
+        <a href="{{ url_for('lotti_view') }}"
+            class="block text-center text-gray-700 mt-6 text-sm hover:text-gray-600 hover:underline">
+            ← Torna alla lista lotti
+        </a>
+
+        
+    </form>
+
+</div>
+
+<script>
+    document.getElementById('formScarico').addEventListener('submit', function (e) {
+        const select = document.getElementById('prodottoSelect');
+        const inputQta = document.getElementById('inputQuantita');
+
+        // Recupera l'opzione selezionata
+        const selectedOption = select.options[select.selectedIndex];
+
+        if (!selectedOption.value) return; // Se non ha selezionato nulla, lascia al browser il controllo 'required'
+
+        const maxDisponibile = parseInt(selectedOption.getAttribute('data-max'));
+        const qtaRichiesta = parseInt(inputQta.value);
+
+        if (qtaRichiesta > maxDisponibile) {
+            // BLOCCO L'INVIO
+            e.preventDefault();
+
+            alert("❌ Errore: Quantità non disponibile!\n\n" +
+                "Hai inserito: " + qtaRichiesta + "\n" +
+                "Massimo disponibile: " + maxDisponibile);
+
+            inputQta.classList.add('border-red-500', 'bg-red-50');
+            inputQta.focus();
+        }
+    });
+
+    // Resetta lo stile rosso quando l'utente cambia quantità
+    document.getElementById('inputQuantita').addEventListener('input', function () {
+        this.classList.remove('border-red-500', 'bg-red-50');
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,192 @@
+/* Reset base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  min-height: 100vh;
+  color: #333;
+}
+
+/* Container login */
+.container {
+  width: 360px;
+  margin: 100px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+}
+
+.container h1 {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #2a5298;
+}
+
+/* Dashboard */
+.dashboard-container {
+  width: 90%;
+  max-width: 900px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-container h1 {
+  color: #2a5298;
+  margin-bottom: 15px;
+}
+
+/* Form */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+input,
+select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: #2a5298;
+}
+
+/* Bottoni */
+button {
+  margin-top: 10px;
+  padding: 12px;
+  background: #2a5298;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background: #1e3c72;
+}
+
+/* Flash messages */
+.flash {
+  background: #ffdddd;
+  color: #a70000;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* Tabelle */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+table thead {
+  background: #2a5298;
+  color: #fff;
+}
+
+table th,
+table td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+table tr:nth-child(even) {
+  background: #f4f6f9;
+}
+
+/* Link */
+a {
+  color: #2a5298;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Spaziatura */
+h2 {
+  margin-top: 30px;
+  margin-bottom: 10px;
+  color: #1e3c72;
+}
+
+/* NAVBAR */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1e3c72;
+    padding: 15px 30px;
+    color: #fff;
+}
+
+.logo {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.nav-center a {
+    margin: 0 10px;
+    color: #fff;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+.nav-center a:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.nav-right .user {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.logout {
+    background: #c0392b;
+    padding: 6px 12px;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.logout:hover {
+    background: #a93226;
+}
+

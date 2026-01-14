@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto p-6">
+  <h1 class="text-3xl font-bold mb-8 text-gray-800">Modifica Prodotto</h1>
+
+  <form method="POST" class="bg-white shadow-md rounded-2xl p-6 space-y-6">
+
+    <!-- Grid 2 colonne su md -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Nome -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Nome</label>
+        <input type="text" name="nome" value="{{ prodotto.nome }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      <!-- Categoria -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Categoria</label>
+        <select name="categoria_id"
+                class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+                {% if not is_admin %}disabled{% endif %}>
+          {% for c in categorie %}
+          <option value="{{ c[0] }}" {% if c[0]==prodotto.categoria_id %}selected{% endif %}>
+            {{ c[1] }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Misura -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Misura</label>
+        <input type="text" name="misura" value="{{ prodotto.misura }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+      <!-- Posizione -->
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Posizione</label>
+        <input type="text" name="posizione" value="{{ prodotto.posizione }}"
+               class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+               {% if not is_admin %}disabled{% endif %}>
+      </div>
+
+    </div>
+
+    <!-- Pulsanti -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+      {% if is_admin %}
+      <button type="submit" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-700 transition">
+        Salva modifiche
+      </button>
+      {% else %}
+      <p class="text-sm text-gray-500 italic">
+        Solo gli amministratori possono modificare i dati.
+      </p>
+      {% endif %}
+
+      <a href="{{ url_for('prodotti_view') }}"
+         class="text-gray-600 hover:text-gray-800 font-medium transition">
+        Torna indietro
+      </a>
+    </div>
+
+  </form>
+</div>
+
+{% endblock %}

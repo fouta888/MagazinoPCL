@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex justify-center items-center min-h-[70vh]">
+  <form method="POST" class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md space-y-4">
+
+    <h2 class="text-xl font-bold text-center">➕ Aggiungi Lotto</h2>
+
+    <label class="block font-semibold">Prodotto</label>
+    <select name="prodotto_id" required class="w-full border rounded p-2">
+      {% for p in prodotti %}
+        <option value="{{ p[0] }}">{{ p[1] }}</option>
+      {% endfor %}
+    </select>
+
+    <label class="block font-semibold">Quantità</label>
+    <input type="number" name="quantita" min="1" required
+           class="w-full border rounded p-2">
+
+    <label class="block font-semibold">Data scadenza</label>
+    <input type="date" name="data_scadenza"
+           class="w-full border rounded p-2">
+
+    <button class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
+      💾 Carica Lotto
+    </button>
+
+    <a href="{{ url_for('lotti_view') }}"
+            class="block text-center text-gray-700 mt-6 text-sm hover:text-gray-600 hover:underline">
+            ← Torna alla lista lotti
+        </a>
+
+  </form>
+</div>
+
+{% endblock %}
+
+

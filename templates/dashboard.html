@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-bold text-yellow-400 mb-6">Dashboard</h1>
+
+<!-- CARDS DASHBOARD -->
+<section class="grid grid-cols-3 sm:grid-cols-5 gap-6 mt-4">
+
+  <!-- Totale Prodotti -->
+  <div class="bg-white p-3 rounded-lg shadow text-center h-24 w-50 flex flex-col justify-center">
+    <p class="text-xs text-gray-500 uppercase">Totale Prodotti</p>
+    <p class="text-3xl font-bold text-indigo-600">{{ totale_prodotti }}</p>
+  </div>
+
+  <!-- Movimenti Oggi -->
+  <div class="bg-white p-3 rounded-lg shadow text-center h-24 w-50 flex flex-col justify-center">
+    <p class="text-xs text-gray-500 uppercase">Movimenti Oggi</p>
+    <p class="text-3xl font-bold text-green-600">{{ movimenti_oggi }}</p>
+  </div>
+
+  <!-- Utenti Attivi -->
+  <div class="bg-white p-3 rounded-lg shadow text-center h-24 w-50 flex flex-col justify-center">
+    <p class="text-xs text-gray-500 uppercase">Utenti Attivi</p>
+    <p class="text-3xl font-bold text-blue-600">{{ utenti_attivi }}</p>
+  </div>
+
+  <!-- LOTTI IN SCADENZA (ADMIN) -->
+  {% if ruolo == "Amministratore" %}
+  <button onclick="openDrawer('scadenzeDrawer')"
+    class="bg-yellow-100 hover:bg-yellow-200 rounded-xl shadow p-3 h-24 w-50 flex flex-col items-center justify-center transition">
+    <span class="text-4xl mb-2">⚠️</span>
+    <p class="text-xs uppercase text-gray-600">Scadenze</p>
+    <p class="text-xl font-bold text-yellow-800">
+      {{ lotti_in_scadenza|length }}
+    </p>
+  </button>
+  {% endif %}
+
+  <!-- PREVISIONE ESAURIMENTO (ADMIN) -->
+  {% if ruolo == "Amministratore" %}
+  <button onclick="openDrawer('esaurimentoDrawer')"
+    class="bg-red-100 hover:bg-red-200 rounded-xl shadow p-3 h-24 w-50 flex flex-col items-center justify-center transition">
+    <span class="text-4xl mb-2">📉</span>
+    <p class="text-xs uppercase text-gray-600">Esaurimento</p>
+    <p class="text-xl font-bold text-red-700">
+      {{ previsioni_esaurimento|length }}
+    </p>
+  </button>
+  {% endif %}
+
+</section>
+
+
+
+<!-- OVERLAY -->
+<div id="drawerOverlay" onclick="closeDrawer()" class="fixed inset-0 bg-black/40 hidden z-40"></div>
+
+<!-- DRAWER -->
+<div id="drawer" class="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl
+         transform translate-y-full transition-transform duration-300
+         z-50 max-h-[80vh] overflow-y-auto">
+
+  <div class="p-4 border-b flex justify-between items-center">
+    <h2 id="drawerTitle" class="font-bold text-lg"></h2>
+    <button onclick="closeDrawer()" class="text-2xl">✖</button>
+  </div>
+
+  <div id="drawerContent" class="p-4"></div>
+</div>
+
+
+<!-- TEMPLATE LOTTI IN SCADENZA -->
+<template id="scadenzeDrawer">
+  <ul class="text-sm space-y-2">
+    {% for l in lotti_in_scadenza %}
+    <li class="border-b pb-2">
+      🧪 <strong>{{ l[1] }}</strong><br>
+      Q.tà {{ l[2] }} – <span class="text-red-600">{{ l[3] }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</template>
+
+<!-- TEMPLATE ESAURIMENTO -->
+<template id="esaurimentoDrawer">
+  <table class="w-full text-sm">
+    <thead class="border-b">
+      <tr class="text-left">
+        <th>Prodotto</th>
+        <th>Q.tà</th>
+        <th>Giorni</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in previsioni_esaurimento %}
+      <tr class="{% if p.giorni <= 7 %}font-bold text-red-700{% endif %}">
+        <td>{{ p.nome }}</td>
+        <td>{{ p.quantita }}</td>
+        <td>{{ p.giorni }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</template>
+
+
+
+
+<!-- GRAFICI -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+
+  <!-- Grafico Prodotti -->
+  <div class="bg-white rounded-xl shadow flex flex-col">
+    <div class="px-6 py-3 border-b">
+      <h2 class="font-semibold text-gray-700">Prodotti per Categoria</h2>
+    </div>
+
+    <!-- CONTENITORE CON ALTEZZA FISSA -->
+    <div class="relative h-[330px] p-4">
+      <canvas id="prodottiChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Grafico Movimenti -->
+  <div class="bg-white rounded-xl shadow flex flex-col">
+    <div class="px-6 py-3 border-b">
+      <h2 class="font-semibold text-gray-700">Movimenti Ultimi 7 Giorni</h2>
+    </div>
+
+    <div class="relative h-[330px] p-4">
+      <canvas id="movimentiChart"></canvas>
+    </div>
+  </div>
+
+</section>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // 1. Recupera i dati dal tag JSON che hai creato
+    const dataElement = document.getElementById('dashboard-data');
+    const data = JSON.parse(dataElement.textContent);
+
+    // --- CONFIGURAZIONE GRAFICO PRODOTTI (BARRE) ---
+    const ctxProdotti = document.getElementById('prodottiChart').getContext('2d');
+    new Chart(ctxProdotti, {
+      type: 'bar',
+      data: {
+        labels: data.categorie_labels,
+        datasets: [{
+          label: 'Quantità Prodotti',
+          data: data.categorie_quantita,
+          backgroundColor: 'rgba(59, 130, 246, 0.6)', // Blue Tailwind
+          borderColor: 'rgb(59, 130, 246)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+
+    // --- CONFIGURAZIONE GRAFICO MOVIMENTI (LINEE) ---
+    const ctxMovimenti = document.getElementById('movimentiChart').getContext('2d');
+    new Chart(ctxMovimenti, {
+      type: 'line',
+      data: {
+        labels: data.movimenti_labels,
+        datasets: [
+          {
+            label: 'Entrate',
+            data: data.movimenti_entrata,
+            borderColor: 'rgb(34, 197, 94)', // Green Tailwind
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            fill: true,
+            tension: 0.3
+          },
+          {
+            label: 'Uscite',
+            data: data.movimenti_uscita,
+            borderColor: 'rgb(239, 68, 68)', // Red Tailwind
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            fill: true,
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  });
+</script>
+
+<!-- DATI JSON -->
+<script id="dashboard-data" type="application/json">
+{
+  "categorie_labels": {{ categorie_labels | tojson }},
+  "categorie_quantita": {{ categorie_quantita | tojson }},
+  "movimenti_labels": {{ movimenti_trend.labels | tojson }},
+  "movimenti_entrata": {{ movimenti_trend.in_entrata | tojson }},
+  "movimenti_uscita": {{ movimenti_trend.in_uscita | tojson }}
+}
+</script>
+
+<script>
+  function toggleSection(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle("hidden");
+  }
+</script>
+
+<script>
+  function openDrawer(templateId) {
+    const template = document.getElementById(templateId)
+    document.getElementById("drawerContent").innerHTML = template.innerHTML
+    document.getElementById("drawerTitle").innerText =
+      templateId === "scadenzeDrawer"
+        ? "⚠️ Lotti in scadenza"
+        : "📉 Previsione esaurimento"
+
+    document.getElementById("drawerOverlay").classList.remove("hidden")
+    document.getElementById("drawer").classList.remove("translate-y-full")
+  }
+
+  function closeDrawer() {
+    document.getElementById("drawer").classList.add("translate-y-full")
+    document.getElementById("drawerOverlay").classList.add("hidden")
+  }
+</script>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Storico Movimenti{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">Storico Movimenti (FIFO)</h1>
+
+<!-- Filtri ricerca -->
+<div class="mb-4 flex flex-col sm:flex-row items-center gap-3">
+  <input id="searchInput" type="text" placeholder="🔍 Cerca per prodotto, tipo, lotto..."
+    class="flex-1 border border-gray-300 rounded-lg p-2" onkeyup="filterTable()" />
+
+  <!-- Toggle solo uscita FIFO -->
+  <button id="fifoToggle" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+    Mostra solo uscita (FIFO)
+  </button>
+</div>
+
+<div class="overflow-x-auto bg-white shadow rounded-lg border border-gray-200">
+  <table id="movimentiTable" class="w-full text-sm text-left table-auto">
+    <thead class="bg-gray-100 border-b text-gray-700">
+      <tr>
+        <th class="px-4 py-2">ID</th>
+        <th class="px-4 py-2">Data</th>
+        <th class="px-4 py-2">Tipo</th>
+        <th class="px-4 py-2">Prodotto</th>
+        <th class="px-4 py-2">Quantità</th>
+        <th class="px-4 py-2">Scadenza</th>
+        <th class="px-4 py-2">Posizione</th>
+        <th class="px-4 py-2">Note</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y text-gray-800">
+      {% for m in movimenti %}
+      <tr data-tipo="{{ m[2] }}">
+        <td class="px-4 py-2">{{ m[0] }}</td>
+        <td class="px-4 py-2">{{ m[1] }}</td>
+        <td class="px-4 py-2">
+          {% if m[2] == 'entrata' %}
+          <span class="text-green-600 font-bold">Entrata</span>
+          {% else %}
+          <span class="text-red-600 font-bold">Uscita</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-2">{{ m[4] }}</td>
+        <td class="px-4 py-2">{{ m[3] }}</td>
+        <td class="px-4 py-2">{{ m[5] if m[5] else "—" }}</td>
+        <td class="px-4 py-2">{{ m[6] }}</td>
+        <td class="px-4 py-2">{{ m[7] if m[7] else "—" }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="8" class="text-center py-4 text-gray-500">Nessun movimento disponibile</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Filtro JavaScript -->
+<script>
+  const searchInput = document.getElementById("searchInput");
+  const fifoToggle = document.getElementById("fifoToggle");
+
+  function filterTable() {
+    const input = searchInput.value.toLowerCase();
+    const rows = document.querySelectorAll("#movimentiTable tbody tr");
+
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll("td"));
+      const match = cells.some(td => td.textContent.toLowerCase().includes(input));
+      row.style.display = match ? "" : "none";
+    });
+  }
+
+  // Toggle solo uscita FIFO
+  let fifoActive = false;
+  fifoToggle.addEventListener("click", () => {
+    fifoActive = !fifoActive;
+    fifoToggle.textContent = fifoActive ? "Mostra tutti i movimenti" : "Mostra solo uscita (FIFO)";
+
+    const rows = document.querySelectorAll("#movimentiTable tbody tr");
+    rows.forEach(row => {
+      const tipo = row.dataset.tipo;
+      if (!tipo) return;
+      if (fifoActive) {
+        row.style.display = tipo === "uscita" ? "" : "none";
+      } else {
+        row.style.display = "";
+      }
+    });
+
+    filterTable(); // Applica anche filtro ricerca
+  });
+</script>
+
+{% endblock %}
