@@ -47,6 +47,8 @@ CREATE TABLE prodotti (
     attivo BOOLEAN DEFAULT TRUE
 );
 
+
+
 -- LOTTI
 CREATE TABLE lotti (
     id SERIAL PRIMARY KEY,

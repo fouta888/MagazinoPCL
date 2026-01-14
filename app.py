@@ -491,6 +491,48 @@ def elimina_lotto(lotto_id):
     return redirect(url_for("lotti_view"))
 
 
+# -------- MESSAGGI --------
+@app.route("/messaggi", methods=["GET", "POST"])
+@login_required
+def messaggi():
+    db = get_db()
+    cur = db.cursor()
+    user_id = session["user_id"]
+
+    # Recupera tutti gli utenti tranne me stesso
+    cur.execute("SELECT id, username FROM utenti WHERE id != %s AND attivo=TRUE", (user_id,))
+    utenti = cur.fetchall()
+
+    if request.method == "POST":
+        destinatario_id = request.form.get("destinatario_id")
+        contenuto = request.form.get("contenuto")
+
+        if not destinatario_id or not contenuto:
+            flash("Compila tutti i campi!")
+        else:
+            cur.execute("""
+                INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
+                VALUES (%s, %s, %s)
+            """, (user_id, destinatario_id, contenuto))
+            db.commit()
+            flash("Messaggio inviato!")
+
+    # Recupera messaggi inviati e ricevuti
+    cur.execute("""
+        SELECT m.id, m.contenuto, m.data_creazione, 
+               mittente.username AS mittente_nome,
+               destinatario.username AS destinatario_nome
+        FROM messaggi m
+        JOIN utenti mittente ON m.mittente_id = mittente.id
+        JOIN utenti destinatario ON m.destinatario_id = destinatario.id
+        WHERE m.mittente_id=%s OR m.destinatario_id=%s
+        ORDER BY m.data_creazione DESC
+    """, (user_id, user_id))
+    messaggi_list = cur.fetchall()
+
+    db.close()
+    return render_template("messaggi.html", utenti=utenti, messaggi=messaggi_list)
+
 
 @app.route("/movimenti/elimina/<int:movimento_id>")
 @ruolo_required("Amministratore", "Manager")
