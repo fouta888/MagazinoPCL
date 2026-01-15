@@ -1,60 +1,60 @@
 <!DOCTYPE html>
 <html lang="it">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Categorie - Magazzino</title>
 
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <script src="https://cdn.tailwindcss.com"></script>
+<head>
+  <meta charset="UTF-8" />
+  <title>Categorie - Magazzino</title>
 
-    <style>
-      body {
-        font-family: "Inter", sans-serif;
-        background-color: #eef2f7;
-      }
-    </style>
-  </head>
+  <!-- Viewport per dispositivi mobili, senza zoom -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-  <body class="bg-blue-800">
-    {% include "_header.html" %}
 
-    <main class="max-w-5xl mx-auto p-8 space-y-6">
-      <h1 class="text-3xl font-bold text-yellow-400">Categorie Prodotti</h1>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
 
-      <div class="bg-white shadow rounded-lg overflow-x-auto">
-        <table class="w-full text-sm text-left">
-          <thead class="bg-gray-100 text-gray-700 uppercase">
-            <tr>
-              <th class="px-6 py-3">ID</th>
-              <th class="px-6 py-3">Nome</th>
-              <th class="px-6 py-3">Descrizione</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
-            {% for categoria in categorie %}
-            <tr class="hover:bg-gray-50">
-              <td class="px-6 py-3 font-semibold text-indigo-600">
-                <a
-                  href="{{ url_for('prodotti_per_categoria', categoria_id=categoria[0]) }}"
-                  class="hover:underline"
-                >
-                  {{ categoria[1] }}
-                </a>
-              </td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="3" class="px-6 py-4 text-center text-gray-500">
-                Nessuna categoria trovata.
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </main>
-  </body>
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+      background-color: #eef2f7;
+    }
+  </style>
+</head>
+
+<body class="bg-blue-800">
+  {% include "_header.html" %}
+
+  <main class="max-w-5xl mx-auto p-8 space-y-6">
+    <h1 class="text-3xl font-bold text-yellow-400">Categorie Prodotti</h1>
+
+    <div class="bg-white shadow rounded-lg overflow-x-auto">
+      <table class="w-full text-sm text-left">
+        <thead class="bg-gray-100 text-gray-700 uppercase">
+          <tr>
+            <th class="px-6 py-3">ID</th>
+            <th class="px-6 py-3">Nome</th>
+            <th class="px-6 py-3">Descrizione</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {% for categoria in categorie %}
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-3 font-semibold text-indigo-600">
+              <a href="{{ url_for('prodotti_per_categoria', categoria_id=categoria[0]) }}" class="hover:underline">
+                {{ categoria[1] }}
+              </a>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+              Nessuna categoria trovata.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+
 </html>
