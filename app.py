@@ -117,6 +117,7 @@ def login():
         if user and check_password_hash(user[1], password):
             session["user_id"] = user[0]
             session["ruolo"] = user[2]
+            session["username"] = username
             return redirect(url_for("dashboard"))
         else:
             flash("Credenziali non valide")
@@ -494,22 +495,18 @@ def elimina_lotto(lotto_id):
 # -------- MESSAGGI --------
 @app.route("/messaggi", methods=["GET", "POST"])
 @login_required
+@ruolo_required("Amministratore", "Manager")
 def messaggi():
     db = get_db()
     cur = db.cursor()
-    user_id = session["user_id"]
 
-    # Recupera tutti gli utenti tranne me stesso
-    cur.execute("SELECT id, username FROM utenti WHERE id != %s AND attivo=TRUE", (user_id,))
-    utenti = cur.fetchall()
+    user_id = session["user_id"]
 
     if request.method == "POST":
         destinatario_id = request.form.get("destinatario_id")
         contenuto = request.form.get("contenuto")
 
-        if not destinatario_id or not contenuto:
-            flash("Compila tutti i campi!")
-        else:
+        if destinatario_id and contenuto:
             cur.execute("""
                 INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
                 VALUES (%s, %s, %s)
@@ -517,21 +514,131 @@ def messaggi():
             db.commit()
             flash("Messaggio inviato!")
 
-    # Recupera messaggi inviati e ricevuti
+    # Utenti Admin / Manager
     cur.execute("""
-        SELECT m.id, m.contenuto, m.data_creazione, 
-               mittente.username AS mittente_nome,
-               destinatario.username AS destinatario_nome
+        SELECT u.id, u.username
+        FROM utenti u
+        JOIN ruoli r ON u.ruolo_id = r.id
+        WHERE r.nome IN ('Amministratore', 'Manager')
+          AND u.attivo = TRUE
+          AND u.id != %s
+    """, (user_id,))
+    utenti = cur.fetchall()
+
+    # Messaggi
+    cur.execute("""
+        SELECT m.id, m.contenuto, m.data_creazione,
+               mittente.username,
+               destinatario.username
         FROM messaggi m
         JOIN utenti mittente ON m.mittente_id = mittente.id
         JOIN utenti destinatario ON m.destinatario_id = destinatario.id
         WHERE m.mittente_id=%s OR m.destinatario_id=%s
         ORDER BY m.data_creazione DESC
     """, (user_id, user_id))
+
     messaggi_list = cur.fetchall()
+    db.close()
+
+    return render_template(
+        "messaggi.html",
+        utenti=utenti,
+        messaggi=messaggi_list
+    )
+
+
+
+@app.route("/messaggi/<int:dest_id>", methods=["GET", "POST"])
+@login_required
+@ruolo_required("Amministratore", "Manager")
+def chat_privata(dest_id):
+    db = get_db()
+    cur = db.cursor()
+    user_id = session["user_id"]
+
+    if request.method == "POST":
+        contenuto = request.form.get("contenuto")
+        if contenuto:
+            cur.execute("""
+                INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
+                VALUES (%s, %s, %s)
+            """, (user_id, dest_id, contenuto))
+            db.commit()
+
+    # info destinatario
+    cur.execute("SELECT username FROM utenti WHERE id=%s", (dest_id,))
+    destinatario = cur.fetchone()
+
+    # messaggi SOLO tra voi due
+    cur.execute("""
+        SELECT m.contenuto, m.data_creazione,
+               mittente.username, destinatario.username
+        FROM messaggi m
+        JOIN utenti mittente ON m.mittente_id = mittente.id
+        JOIN utenti destinatario ON m.destinatario_id = destinatario.id
+        WHERE (m.mittente_id=%s AND m.destinatario_id=%s)
+           OR (m.mittente_id=%s AND m.destinatario_id=%s)
+        ORDER BY m.data_creazione
+    """, (user_id, dest_id, dest_id, user_id))
+
+    messaggi = cur.fetchall()
+
+    # lista utenti (sidebar)
+    cur.execute("""
+        SELECT u.id, u.username
+        FROM utenti u
+        JOIN ruoli r ON u.ruolo_id = r.id
+        WHERE r.nome IN ('Amministratore', 'Manager')
+          AND u.attivo=TRUE
+          AND u.id != %s
+    """, (user_id,))
+    utenti = cur.fetchall()
 
     db.close()
-    return render_template("messaggi.html", utenti=utenti, messaggi=messaggi_list)
+
+    return render_template(
+        "chat_privata.html",
+        utenti=utenti,
+        messaggi=messaggi,
+        destinatario=destinatario,
+        dest_id=dest_id
+    )
+
+
+@app.route("/broadcast", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def broadcast():
+    contenuto = request.form.get("contenuto")
+    if not contenuto:
+        flash("Messaggio vuoto")
+        return redirect(url_for("messaggi"))
+
+    db = get_db()
+    cur = db.cursor()
+
+    cur.execute("""
+        SELECT u.id
+        FROM utenti u
+        JOIN ruoli r ON u.ruolo_id = r.id
+        WHERE r.nome='Manager' AND u.attivo=TRUE
+    """)
+
+    manager_ids = cur.fetchall()
+
+    for (uid,) in manager_ids:
+        cur.execute("""
+            INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
+            VALUES (%s, %s, %s)
+        """, (session["user_id"], uid, contenuto))
+
+    db.commit()
+    db.close()
+
+    flash("Messaggio inviato a tutti i Manager")
+    return redirect(url_for("messaggi"))
+
+
 
 
 @app.route("/movimenti/elimina/<int:movimento_id>")
