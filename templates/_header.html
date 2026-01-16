@@ -1,94 +1,150 @@
 <header class="bg-yellow-300 text-gray-900 p-2 sticky top-0 z-50 shadow-lg w-full">
-  <div class="flex items-center justify-between">
-    <!-- Logo + Titolo -->
+  <div class="flex items-center justify-between pr-4">
+
+    <!-- Logo -->
     <div class="flex items-center space-x-3">
-      <img src="{{ url_for('static', filename='Magazzino.jpg') }}" alt="Logo" class="h-10 w-auto">
+      <img src="{{ url_for('static', filename='Magazzino.jpg') }}" class="h-10">
       <span class="text-xl font-bold">Magazzino PCL</span>
     </div>
 
-    <!-- Hamburger mobile -->
-    <div class="lg:hidden">
-      <button id="menu-btn" class="focus:outline-none">
-        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-      </button>
-    </div>
+    <!-- Hamburger -->
+    <button id="menu-btn" class="lg:hidden">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
 
-    <!-- Menu desktop -->
-    <nav id="menu" class="hidden lg:flex lg:space-x-4 items-center">
+    <!-- DESKTOP MENU -->
+    <nav class="hidden lg:flex items-center gap-2">
+
+      {% set active = "bg-blue-600 text-white" %}
+      {% set base = "flex items-center gap-2 px-3 py-2 rounded-xl font-semibold hover:bg-blue-500 hover:text-white" %}
+
       <a href="{{ url_for('dashboard') }}"
-        class="hover:text-indigo-400 px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">Dashboard</a>
+        class="{{ base }} {% if request.endpoint=='dashboard' %}{{ active }}{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2 7-7 7 7m-9 2v8" />
+        </svg>
+        Dashboard
+      </a>
+
       <a href="{{ url_for('prodotti_view') }}"
-        class="hover:text-indigo-400 px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">Prodotti</a>
+        class="{{ base }} {% if 'prodotti' in request.endpoint %}{{ active }}{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20 7H4v10h16V7z" />
+        </svg>
+        Prodotti
+      </a>
+
       <a href="{{ url_for('categorie_view') }}"
-        class="hover:text-indigo-400 px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">Categorie</a>
+        class="{{ base }} {% if 'categorie' in request.endpoint %}{{ active }}{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18" />
+        </svg>
+        Categorie
+      </a>
+
       <a href="{{ url_for('movimenti_view') }}"
-        class="hover:text-indigo-400 px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">Movimenti</a>
-      {% if session.get("ruolo") == "Amministratore" %}
-      <a href="{{ url_for('utenti') }}"
-        class="hover:text-indigo-400 px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">Utenti</a>
-      {% endif %}
+        class="{{ base }} {% if 'movimenti' in request.endpoint %}{{ active }}{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 16l-4-4 4-4m10 8l4-4-4-4" />
+        </svg>
+        Movimenti
+      </a>
+
       <a href="{{ url_for('lotti_view') }}"
-        class="hover:text-indigo-400 px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">Lotti</a>
-      {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+        class="{{ base }} {% if 'lotti' in request.endpoint %}{{ active }}{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4v10l8 4 8-4V7z" />
+        </svg>
+        Lotti
+      </a>
+
+      {% if session.get("ruolo") in ["Amministratore","Manager"] %}
       <a href="{{ url_for('messaggi') }}"
-        class="relative px-3 py-1 hover:bg-blue-500 hover:text-white rounded-xl font-semibold">
-        💬 Messaggi
-        {% set unread = inbox|selectattr('3','equalto',False)|list|length if inbox else 0 %}
-        {% if unread > 0 %}
-        <span class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 rounded-full">{{ unread
-          }}</span>
+        class="relative {{ base }} {% if 'messaggi' in request.endpoint %}{{ active }}{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8 10h8M8 14h6m-6 6l-4 4V4a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H8z" />
+        </svg>
+        Messaggi
+        {% if inbox %}
+        <span class="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 rounded-full">
+          {{ inbox|length }}
+        </span>
         {% endif %}
       </a>
       {% endif %}
-      <a href="{{ url_for('qr_code') }}"
-        class="bg-gray-700 text-white px-2 py-1 rounded-lg hover:bg-indigo-700 transition" target="_blank">QR Login</a>
-      <div class="flex items-center space-x-2">
-        <svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M10 10a4 4 0 100-8 4 4 0 000 8zm-7 8a7 7 0 0114 0H3z" />
-        </svg>
-        <span class="text-sm opacity-80">{{ session.get("ruolo") }}</span>
-      </div>
+
       <a href="{{ url_for('logout') }}"
-        class="flex items-center text-white py-1 px-2 bg-gray-400 rounded-xl hover:text-red-600 transition">
-        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd"
-            d="M3 4a1 1 0 011-1h6a1 1 0 110 2H5v10h5a1 1 0 110 2H4a1 1 0 01-1-1V4zm11.293 2.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L15.586 11H9a1 1 0 110-2h6.586l-1.293-1.293a1 1 0 010-1.414z"
-            clip-rule="evenodd" />
+        class="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-xl hover:bg-red-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7" />
         </svg>
-        <span>Logout</span>
+        Logout
       </a>
+
     </nav>
   </div>
 </header>
 
-<!-- Overlay -->
+<!-- OVERLAY -->
 <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40"></div>
 
-<!-- Menu mobile drawer -->
+<!-- MOBILE DRAWER -->
 <div id="mobile-menu"
-  class="fixed top-0 right-0 h-full w-64 bg-gray-800 text-white transform translate-x-full transition-transform z-50 shadow-lg flex flex-col p-4 space-y-3">
-  <a href="{{ url_for('dashboard') }}" class="hover:text-indigo-400">Dashboard</a>
-  <a href="{{ url_for('prodotti_view') }}" class="hover:text-indigo-400">Prodotti</a>
-  <a href="{{ url_for('categorie_view') }}" class="hover:text-indigo-400">Categorie</a>
-  <a href="{{ url_for('movimenti_view') }}" class="hover:text-indigo-400">Movimenti</a>
-  {% if session.get("ruolo") == "Amministratore" %}
-  <a href="{{ url_for('utenti') }}" class="hover:text-indigo-400">Utenti</a>
-  {% endif %}
-  <a href="{{ url_for('lotti_view') }}" class="hover:text-indigo-400">Lotti</a>
-  {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
-  <a href="{{ url_for('messaggi') }}" class="hover:text-indigo-400 relative">
-    💬 Messaggi
-    {% set unread = inbox|selectattr('3','equalto',False)|list|length if inbox else 0 %}
-    {% if unread > 0 %}
-    <span class="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-2 rounded-full">{{ unread }}</span>
-    {% endif %}
+  class="fixed top-0 right-0 h-full w-64 bg-gray-800 text-white transform translate-x-full transition-transform z-50 p-4 space-y-3">
+
+  {% macro mobile_link(url, icon, label) %}
+  <a href="{{ url }}" class="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-blue-600">
+    {{ icon|safe }} <span>{{ label }}</span>
   </a>
+  {% endmacro %}
+
+  {{ mobile_link(url_for('dashboard'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9" />
+  </svg>',
+  'Dashboard') }}
+
+  {{ mobile_link(url_for('prodotti_view'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M20 7H4v10h16V7z" />
+  </svg>',
+  'Prodotti') }}
+
+  {{ mobile_link(url_for('categorie_view'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M3 7h18M3 12h18M3 17h18" />
+  </svg>',
+  'Categorie') }}
+
+  {{ mobile_link(url_for('movimenti_view'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M7 16l-4-4 4-4m10 8l4-4-4-4" />
+  </svg>',
+  'Movimenti') }}
+
+  {{ mobile_link(url_for('lotti_view'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M20 7l-8-4-8 4v10l8 4 8-4z" />
+  </svg>',
+  'Lotti') }}
+
+  {% if session.get("ruolo") in ["Amministratore","Manager"] %}
+  {{ mobile_link(url_for('messaggi'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M8 10h8M8 14h6m-6 6l-4 4V4" />
+  </svg>',
+  'Messaggi') }}
   {% endif %}
-  <a href="{{ url_for('qr_code') }}"
-    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">QR Login</a>
-  <a href="{{ url_for('logout') }}" class="hover:text-red-400">Logout</a>
+
+  {{ mobile_link(url_for('logout'),
+  '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M17 16l4-4-4-4M21 12H7" />
+  </svg>',
+  'Logout') }}
+
 </div>
 
 <script>
@@ -96,14 +152,13 @@
   const menu = document.getElementById("mobile-menu");
   const overlay = document.getElementById("overlay");
 
-  btn.addEventListener("click", () => {
+  btn.onclick = () => {
     menu.classList.toggle("translate-x-full");
     overlay.classList.toggle("hidden");
-  });
+  };
 
-  // chiude il drawer cliccando sull'overlay
-  overlay.addEventListener("click", () => {
+  overlay.onclick = () => {
     menu.classList.add("translate-x-full");
     overlay.classList.add("hidden");
-  });
+  };
 </script>
