@@ -1,16 +1,20 @@
 // Leggi i dati JSON incorporati nell'HTML
+// Leggi i dati JSON incorporati nell'HTML
 const data = JSON.parse(document.getElementById("dashboard-data").textContent);
 
-// 🥧 Grafico Prodotti per Categoria (Torta)
+// --- GESTIONE GRAFICO PRODOTTI (TORTA) ---
+let chartProdotti = Chart.getChart("prodottiChart"); 
+if (chartProdotti !== undefined) {
+  chartProdotti.destroy();
+}
+
 new Chart(document.getElementById("prodottiChart"), {
   type: "pie",
   data: {
     labels: data.categorie_labels,
     datasets: [{
       data: data.categorie_quantita,
-      backgroundColor: [
-        "#6366f1", "#22c55e", "#f97316", "#ef4444", "#0ea5e9"
-      ]
+      backgroundColor: ["#6366f1", "#22c55e", "#f97316", "#ef4444", "#0ea5e9"]
     }]
   },
   options: {
@@ -19,7 +23,12 @@ new Chart(document.getElementById("prodottiChart"), {
   }
 });
 
-// 📊 Grafico Movimenti Entrate/Uscite (Bar)
+// --- GESTIONE GRAFICO MOVIMENTI (BARRE) ---
+let chartMovimenti = Chart.getChart("movimentiChart");
+if (chartMovimenti !== undefined) {
+  chartMovimenti.destroy();
+}
+
 new Chart(document.getElementById("movimentiChart"), {
   type: "bar",
   data: {
@@ -41,9 +50,7 @@ new Chart(document.getElementById("movimentiChart"), {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: "top"
-      }
+      legend: { position: "top" }
     }
   }
 });
