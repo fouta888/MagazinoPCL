@@ -36,30 +36,44 @@
       <table class="min-w-full border-collapse">
         <thead>
           <tr class="bg-gray-200 text-left">
+            {% if session['ruolo'] == 'Amministratore' %}
             <th class="p-2 border">ID</th>
+            {% endif %}
             <th class="p-2 border">Username</th>
+            {% if session['ruolo'] == 'Amministratore' %}
             <th class="p-2 border">Ruolo</th>
             <th class="p-2 border">Attivo</th>
-            {% if session['ruolo'] in ['Amministratore', 'Manager'] %}
-            <th class="p-2 border">Azioni</th>
             {% endif %}
+            <th class="p-2 border">Azioni</th>
           </tr>
         </thead>
         <tbody>
           {% for u in utenti %}
           <tr class="border-t">
+            {% if session['ruolo'] == 'Amministratore' %}
             <td class="p-2 border">{{ u[0] }}</td>
-            <td class="p-2 border">{{ u[1] }}</td>
+            {% endif %}
+
+            <td class="p-2 border font-medium text-gray-700">{{ u[1] }}</td>
+
+            {% if session['ruolo'] == 'Amministratore' %}
             <td class="p-2 border">{{ u[2] }}</td>
             <td class="p-2 border">{{ 'Sì' if u[3] else 'No' }}</td>
-            {% if session['ruolo'] in ['Amministratore', 'Manager'] %}
-            <td class="p-2 border space-x-2">
-              <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}"
-                class="text-blue-600 hover:underline">Modifica</a>
-              <a href="{{ url_for('elimina_utente', utente_id=u[0]) }}" class="text-red-600 hover:underline"
-                onclick="return confirm('Sei sicuro di voler eliminare questo utente?');">Elimina</a>
-            </td>
             {% endif %}
+
+            <td class="p-2 border space-x-2">
+              {% if session['ruolo'] == 'Amministratore' %}
+              <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}" class="text-blue-600 hover:underline">✏️
+                Modifica</a>
+              <a href="{{ url_for('elimina_utente', utente_id=u[0]) }}" class="text-red-600 hover:underline"
+                onclick="return confirm('Sei sicuro?');">🗑️ Elimina</a>
+              {% else %}
+              <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}"
+                class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-600">
+                🔑 Cambia Password
+              </a>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
