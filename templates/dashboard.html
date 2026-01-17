@@ -4,73 +4,62 @@
 {% block content %}
 <h1 class="text-3xl font-bold text-yellow-400 mb-6">Dashboard</h1>
 
-<!-- CARDS DASHBOARD -->
-<section class="grid grid-cols-3 sm:grid-cols-5 gap-6 mt-4">
+<section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 mt-4">
 
-  <!-- Totale Prodotti -->
-  <div class="bg-white p-3 rounded-lg shadow text-center h-24 w-50 flex flex-col justify-center">
-    <p class="text-xs text-gray-500 uppercase">Totale Prodotti</p>
+  <div
+    class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-indigo-500">
+    <p class="text-xs text-gray-500 uppercase font-bold">Totale Prodotti</p>
     <p class="text-3xl font-bold text-indigo-600">{{ totale_prodotti }}</p>
   </div>
 
-  <!-- Movimenti Oggi -->
-  <div class="bg-white p-3 rounded-lg shadow text-center h-24 w-50 flex flex-col justify-center">
-    <p class="text-xs text-gray-500 uppercase">Movimenti Oggi</p>
+  <div class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-green-500">
+    <p class="text-xs text-gray-500 uppercase font-bold">Movimenti Oggi</p>
     <p class="text-3xl font-bold text-green-600">{{ movimenti_oggi }}</p>
   </div>
 
-  <!-- Utenti Attivi -->
-  <div class="bg-white p-3 rounded-lg shadow text-center h-24 w-50 flex flex-col justify-center">
-    <p class="text-xs text-gray-500 uppercase">Utenti Attivi</p>
+  {% if session.get("ruolo") == "Amministratore" %}
+  <div class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-blue-500">
+    <p class="text-xs text-gray-500 uppercase font-bold">Utenti Attivi</p>
     <p class="text-3xl font-bold text-blue-600">{{ utenti_attivi }}</p>
   </div>
+  {% else %}
+  <div class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-gray-300">
+    <p class="text-xs text-gray-500 uppercase font-bold">Stato Sistema</p>
+    <p class="text-sm font-bold text-gray-600 uppercase italic">Operativo</p>
+  </div>
+  {% endif %}
 
-  <!-- LOTTI IN SCADENZA (ADMIN) -->
-  {% if ruolo == "Amministratore" %}
+  {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
   <button onclick="openDrawer('scadenzeDrawer')"
-    class="bg-yellow-100 hover:bg-yellow-200 rounded-xl shadow p-3 h-24 w-50 flex flex-col items-center justify-center transition">
-    <span class="text-4xl mb-2">⚠️</span>
-    <p class="text-xs uppercase text-gray-600">Scadenze</p>
-    <p class="text-xl font-bold text-yellow-800">
-      {{ lotti_in_scadenza|length }}
-    </p>
+    class="bg-yellow-100 hover:bg-yellow-200 rounded-xl shadow p-3 h-24 flex flex-col items-center justify-center transition border-b-4 border-yellow-500">
+    <span class="text-2xl">⚠️</span>
+    <p class="text-xs uppercase text-gray-600 font-bold">Scadenze</p>
+    <p class="text-xl font-bold text-yellow-800">{{ lotti_in_scadenza|length }}</p>
   </button>
   {% endif %}
 
-  <!-- PREVISIONE ESAURIMENTO (ADMIN) -->
-  {% if ruolo == "Amministratore" %}
-  <button onclick="openDrawer('esaurimentoDrawer')"
-    class="bg-red-100 hover:bg-red-200 rounded-xl shadow p-3 h-24 w-50 flex flex-col items-center justify-center transition">
-    <span class="text-4xl mb-2">📉</span>
-    <p class="text-xs uppercase text-gray-600">Esaurimento</p>
-    <p class="text-xl font-bold text-red-700">
-      {{ previsioni_esaurimento|length }}
-    </p>
+  {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+  <button onclick="openDrawer('listaSpesaDrawer')"
+    class="bg-orange-100 hover:bg-orange-200 rounded-xl shadow p-3 h-24 flex flex-col items-center justify-center transition border-b-4 border-orange-500">
+    <span class="text-2xl">🛒</span>
+    <p class="text-xs uppercase text-gray-600 font-bold">Lista Spesa</p>
+    <p class="text-xl font-bold text-orange-700">{{ prodotti_sotto_soglia|length }}</p>
   </button>
   {% endif %}
 
 </section>
 
-
-
-<!-- OVERLAY -->
 <div id="drawerOverlay" onclick="closeDrawer()" class="fixed inset-0 bg-black/40 hidden z-40"></div>
 
-<!-- DRAWER -->
-<div id="drawer" class="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl
-         transform translate-y-full transition-transform duration-300
-         z-50 max-h-[80vh] overflow-y-auto">
-
+<div id="drawer"
+  class="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl transform translate-y-full transition-transform duration-300 z-50 max-h-[80vh] overflow-y-auto">
   <div class="p-4 border-b flex justify-between items-center">
     <h2 id="drawerTitle" class="font-bold text-lg"></h2>
     <button onclick="closeDrawer()" class="text-2xl">✖</button>
   </div>
-
   <div id="drawerContent" class="p-4"></div>
 </div>
 
-
-<!-- TEMPLATE LOTTI IN SCADENZA -->
 <template id="scadenzeDrawer">
   <ul class="text-sm space-y-2">
     {% for l in lotti_in_scadenza %}
@@ -82,121 +71,41 @@
   </ul>
 </template>
 
-<!-- TEMPLATE ESAURIMENTO -->
-<template id="esaurimentoDrawer">
-  <table class="w-full text-sm">
-    <thead class="border-b">
-      <tr class="text-left">
-        <th>Prodotto</th>
-        <th>Q.tà</th>
-        <th>Giorni</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in previsioni_esaurimento %}
-      <tr class="{% if p.giorni <= 7 %}font-bold text-red-700{% endif %}">
-        <td>{{ p.nome }}</td>
-        <td>{{ p.quantita }}</td>
-        <td>{{ p.giorni }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<template id="listaSpesaDrawer">
+  <div class="mb-4 flex justify-end">
+    <button onclick="copyListaWhatsApp()"
+      class="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700 transition">
+      📋 Copia per WhatsApp
+    </button>
+  </div>
+  <ul class="text-sm space-y-3">
+    {% for p in prodotti_sotto_soglia %}
+    <li class="border-b pb-2 flex justify-between items-center">
+      <div>
+        <strong>{{ p[0] }}</strong><br>
+        <span class="text-xs text-gray-500 italic text-red-500">Soglia min: {{ p[2] }}</span>
+      </div>
+      <div class="text-right font-bold text-lg">
+        {{ p[1] }}
+      </div>
+    </li>
+    {% else %}
+    <li class="text-center py-4 text-green-600 font-bold italic text-lg">✅ Scorte in regola!</li>
+    {% endfor %}
+  </ul>
 </template>
 
-
-
-
-<!-- GRAFICI -->
 <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-
-  <!-- Grafico Prodotti -->
   <div class="bg-white rounded-xl shadow flex flex-col">
-    <div class="px-6 py-3 border-b">
-      <h2 class="font-semibold text-gray-700">Prodotti per Categoria</h2>
-    </div>
-
-    <!-- CONTENITORE CON ALTEZZA FISSA -->
-    <div class="relative h-[330px] p-4">
-      <canvas id="prodottiChart"></canvas>
-    </div>
+    <div class="px-6 py-3 border-b font-semibold text-gray-700">Prodotti per Categoria</div>
+    <div class="relative h-[330px] p-4"><canvas id="prodottiChart"></canvas></div>
   </div>
-
-  <!-- Grafico Movimenti -->
   <div class="bg-white rounded-xl shadow flex flex-col">
-    <div class="px-6 py-3 border-b">
-      <h2 class="font-semibold text-gray-700">Movimenti Ultimi 7 Giorni</h2>
-    </div>
-
-    <div class="relative h-[330px] p-4">
-      <canvas id="movimentiChart"></canvas>
-    </div>
+    <div class="px-6 py-3 border-b font-semibold text-gray-700">Movimenti Ultimi 7 Giorni</div>
+    <div class="relative h-[330px] p-4"><canvas id="movimentiChart"></canvas></div>
   </div>
-
 </section>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    // 1. Recupera i dati dal tag JSON che hai creato
-    const dataElement = document.getElementById('dashboard-data');
-    const data = JSON.parse(dataElement.textContent);
-
-    // --- CONFIGURAZIONE GRAFICO PRODOTTI (BARRE) ---
-    const ctxProdotti = document.getElementById('prodottiChart').getContext('2d');
-    new Chart(ctxProdotti, {
-      type: 'bar',
-      data: {
-        labels: data.categorie_labels,
-        datasets: [{
-          label: 'Quantità Prodotti',
-          data: data.categorie_quantita,
-          backgroundColor: 'rgba(59, 130, 246, 0.6)', // Blue Tailwind
-          borderColor: 'rgb(59, 130, 246)',
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-
-    // --- CONFIGURAZIONE GRAFICO MOVIMENTI (LINEE) ---
-    const ctxMovimenti = document.getElementById('movimentiChart').getContext('2d');
-    new Chart(ctxMovimenti, {
-      type: 'line',
-      data: {
-        labels: data.movimenti_labels,
-        datasets: [
-          {
-            label: 'Entrate',
-            data: data.movimenti_entrata,
-            borderColor: 'rgb(34, 197, 94)', // Green Tailwind
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            fill: true,
-            tension: 0.3
-          },
-          {
-            label: 'Uscite',
-            data: data.movimenti_uscita,
-            borderColor: 'rgb(239, 68, 68)', // Red Tailwind
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            fill: true,
-            tension: 0.3
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true } }
-      }
-    });
-  });
-</script>
-
-<!-- DATI JSON -->
 <script id="dashboard-data" type="application/json">
 {
   "categorie_labels": {{ categorie_labels | tojson }},
@@ -208,33 +117,80 @@
 </script>
 
 <script>
-  function toggleSection(id) {
-    const el = document.getElementById(id);
-    el.classList.toggle("hidden");
-  }
-</script>
-
-<script>
+  // GESTIONE DRAWER
   function openDrawer(templateId) {
-    const template = document.getElementById(templateId)
-    document.getElementById("drawerContent").innerHTML = template.innerHTML
-    document.getElementById("drawerTitle").innerText =
-      templateId === "scadenzeDrawer"
-        ? "⚠️ Lotti in scadenza"
-        : "📉 Previsione esaurimento"
+    const template = document.getElementById(templateId);
+    document.getElementById("drawerContent").innerHTML = template.innerHTML;
 
-    document.getElementById("drawerOverlay").classList.remove("hidden")
-    document.getElementById("drawer").classList.remove("translate-y-full")
+    const titles = {
+      'scadenzeDrawer': '⚠️ Lotti in Scadenza',
+      'listaSpesaDrawer': '🛒 Lista della Spesa (Sotto Soglia)',
+      'esaurimentoDrawer': '📉 Previsione Esaurimento'
+    };
+
+    document.getElementById("drawerTitle").innerText = titles[templateId] || "Dettagli";
+    document.getElementById("drawerOverlay").classList.remove("hidden");
+    document.getElementById("drawer").classList.remove("translate-y-full");
   }
 
   function closeDrawer() {
-    document.getElementById("drawer").classList.add("translate-y-full")
-    document.getElementById("drawerOverlay").classList.add("hidden")
+    document.getElementById("drawer").classList.add("translate-y-full");
+    document.getElementById("drawerOverlay").classList.add("hidden");
   }
+
+  // FUNZIONE COPIA WHATSAPP
+  function copyListaWhatsApp() {
+    let testo = "*📦 LISTA SPESA PROTEZIONE CIVILE*\n";
+    testo += "Aggiornata al: " + new Date().toLocaleDateString() + "\n\n";
+
+    const items = document.querySelectorAll("#drawerContent li");
+    items.forEach(item => {
+      if (!item.innerText.includes("Scorte in regola")) {
+        // Pulizia del testo per formattazione pulita
+        let righe = item.innerText.split('\n').map(s => s.trim()).filter(s => s !== "");
+        testo += "• *" + righe[0] + "* (Disp: " + righe[2] + ")\n";
+      }
+    });
+
+    navigator.clipboard.writeText(testo).then(() => {
+      alert("✅ Lista copiata! Ora incollala su WhatsApp.");
+    });
+  }
+
+  // GRAFICI CHART.JS
+  document.addEventListener('DOMContentLoaded', function () {
+    const data = JSON.parse(document.getElementById('dashboard-data').textContent);
+
+    const ctxP = document.getElementById('prodottiChart').getContext('2d');
+    new Chart(ctxP, {
+      type: 'bar',
+      data: {
+        labels: data.categorie_labels,
+        datasets: [{
+          label: 'Quantità',
+          data: data.categorie_quantita,
+          backgroundColor: 'rgba(59, 130, 246, 0.6)',
+          borderColor: 'rgb(59, 130, 246)',
+          borderWidth: 1
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    const ctxM = document.getElementById('movimentiChart').getContext('2d');
+    new Chart(ctxM, {
+      type: 'line',
+      data: {
+        labels: data.movimenti_labels,
+        datasets: [
+          { label: 'Entrate', data: data.movimenti_entrata, borderColor: 'rgb(34, 197, 94)', tension: 0.3 },
+          { label: 'Uscite', data: data.movimenti_uscita, borderColor: 'rgb(239, 68, 68)', tension: 0.3 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  });
 </script>
 
-
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 {% endblock %}

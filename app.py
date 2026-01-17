@@ -777,6 +777,7 @@ def dashboard():
     # =========================
     # CARD DATI
     # =========================
+    # Se vuoi vedere il totale dei pezzi (536) usa SUM(quantita), se vuoi i tipi di articoli (82) usa COUNT(*)
     cur.execute("SELECT COUNT(*) FROM prodotti")
     totale_prodotti = cur.fetchone()[0]
 
@@ -787,29 +788,35 @@ def dashboard():
     """)
     movimenti_oggi = cur.fetchone()[0]
 
-    cur.execute("""
-        SELECT COUNT(*) 
-        FROM lotti 
-        WHERE data_scadenza < CURRENT_DATE
-    """)
+    cur.execute("SELECT COUNT(*) FROM lotti WHERE data_scadenza < CURRENT_DATE")
     prodotti_scaduti = cur.fetchone()[0]
 
-    cur.execute("""
-        SELECT COUNT(*) 
-        FROM utenti 
-        WHERE attivo = TRUE
-    """)
+    cur.execute("SELECT COUNT(*) FROM utenti WHERE attivo = TRUE")
     utenti_attivi = cur.fetchone()[0]
 
+    # ==========================================
+    # NOVITÀ: PRODOTTI SOTTO SOGLIA (LISTA SPESA)
+    # ==========================================
+    # Questa query recupera i prodotti dove la quantità attuale è inferiore alla minima impostata
+    cur.execute("""
+        SELECT nome, quantita, quantita_minima 
+        FROM prodotti 
+        WHERE quantita < quantita_minima 
+          AND quantita_minima > 0
+        ORDER BY nome ASC
+    """)
+    prodotti_sotto_soglia = cur.fetchall()
+
     # =========================
-    # ALERT LOTTI IN SCADENZA (ADMIN)
+    # ALERT E PREVISIONI (Admin e Manager)
     # =========================
     lotti_in_scadenza = []
     previsioni_esaurimento = []
 
-    if ruolo == "Amministratore":
+    # Estendiamo la visibilità anche al Manager
+    if ruolo in ["Amministratore", "Manager"]:
         oggi = date.today()
-        soglia = oggi + timedelta(days=7)
+        soglia_scadenza = oggi + timedelta(days=7)
 
         cur.execute("""
             SELECT l.id, p.nome, l.quantita, l.data_scadenza
@@ -818,21 +825,13 @@ def dashboard():
             WHERE l.quantita > 0
               AND l.data_scadenza BETWEEN %s AND %s
             ORDER BY l.data_scadenza ASC
-        """, (oggi, soglia))
+        """, (oggi, soglia_scadenza))
         lotti_in_scadenza = cur.fetchall()
 
-        # =========================
-        # PREVISIONE ESAURIMENTO (SEMPLICE)
-        # =========================
-        cur.execute("""
-            SELECT id, nome, quantita
-            FROM prodotti
-            WHERE quantita > 0
-        """)
-
+        # Previsione esaurimento
+        cur.execute("SELECT id, nome, quantita FROM prodotti WHERE quantita > 0")
         for pid, nome, qta in cur.fetchall():
-            # consumo medio stimato: 1 unità/giorno
-            giorni = qta
+            giorni = qta # consumo stimato 1 unità/gg
             previsioni_esaurimento.append({
                 "nome": nome,
                 "quantita": qta,
@@ -840,28 +839,21 @@ def dashboard():
             })
 
     # =========================
-    # GRAFICO PRODOTTI PER CATEGORIA
+    # GRAFICI (Uguale a prima)
     # =========================
     categorie_labels = []
     categorie_quantita = []
-
     cur.execute("""
         SELECT c.nome, COALESCE(SUM(p.quantita), 0)
         FROM categorie c
         LEFT JOIN prodotti p ON p.categoria_id = c.id
-        GROUP BY c.nome
-        ORDER BY c.nome
+        GROUP BY c.nome ORDER BY c.nome
     """)
-
     for nome, qta in cur.fetchall():
         categorie_labels.append(nome)
         categorie_quantita.append(qta)
 
-    # =========================
-    # GRAFICO MOVIMENTI (ULTIMI 7 GIORNI)
-    # =========================
     movimenti = defaultdict(lambda: {"entrata": 0, "uscita": 0})
-
     cur.execute("""
         SELECT DATE(data_movimento), tipo_movimento, SUM(quantita)
         FROM movimenti
@@ -869,7 +861,6 @@ def dashboard():
         GROUP BY DATE(data_movimento), tipo_movimento
         ORDER BY DATE(data_movimento)
     """)
-
     for giorno, tipo, qta in cur.fetchall():
         movimenti[str(giorno)][tipo] += qta
 
@@ -891,11 +882,11 @@ def dashboard():
         utenti_attivi=utenti_attivi,
         lotti_in_scadenza=lotti_in_scadenza,
         previsioni_esaurimento=previsioni_esaurimento,
+        prodotti_sotto_soglia=prodotti_sotto_soglia, # <--- FONDAMENTALE PER IL DRAWER
         categorie_labels=categorie_labels,
         categorie_quantita=categorie_quantita,
         movimenti_trend=movimenti_trend
     )
-
 
 def controlla_scadenze():
     conn = get_db()
@@ -1026,36 +1017,30 @@ def modifica_prodotto(prodotto_id):
     db = get_db()
     cur = db.cursor()
 
-    # Controllo admin
     is_admin = session.get("ruolo") == "Amministratore"
 
-    # Solo admin può salvare modifiche
     if request.method == "POST" and not is_admin:
         abort(403)
 
     if request.method == "POST" and is_admin:
-        # Prelevo dati dal form
         nome = request.form["nome"]
         categoria_id = request.form["categoria_id"]
         misura = request.form["misura"]
         posizione = request.form["posizione"]
+        quantita_minima = request.form["quantita_minima"] # <--- Prelevo la soglia
 
-        # Aggiorno il prodotto
         cur.execute("""
             UPDATE prodotti
-            SET nome=%s,
-                categoria_id=%s,
-                misura=%s,
-                posizione=%s
+            SET nome=%s, categoria_id=%s, misura=%s, posizione=%s, quantita_minima=%s
             WHERE id=%s
-        """, (nome, categoria_id, misura, posizione, prodotto_id))
+        """, (nome, categoria_id, misura, posizione, quantita_minima, prodotto_id))
 
         db.commit()
         return redirect(url_for("prodotti_view"))
 
-    # GET: prendo i dati del prodotto
+    # GET: prendo i dati includendo quantita_minima
     cur.execute("""
-        SELECT id, nome, categoria_id, misura, posizione
+        SELECT id, nome, categoria_id, misura, posizione, quantita_minima
         FROM prodotti
         WHERE id=%s
     """, (prodotto_id,))
@@ -1068,10 +1053,10 @@ def modifica_prodotto(prodotto_id):
         "nome": r[1],
         "categoria_id": r[2],
         "misura": r[3],
-        "posizione": r[4]
+        "posizione": r[4],
+        "quantita_minima": r[5] # <--- Aggiunto al dizionario
     }
 
-    # Lista categorie
     cur.execute("SELECT id, nome FROM categorie ORDER BY nome")
     categorie = cur.fetchall()
 
@@ -1081,7 +1066,6 @@ def modifica_prodotto(prodotto_id):
         categorie=categorie,
         is_admin=is_admin
     )
-
 
 # -------- ELIMINA PRODOTTO --------
 @app.route("/prodotti/elimina/<int:prodotto_id>")
