@@ -32,8 +32,9 @@
 
       {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
       <a href="{{ url_for('nuovo_prodotto') }}"
-        class="bg-neutral-500 text-slate-50 px-4 py-2 h-12 rounded-lg hover:bg-green-700 transition flex items-center gap-2 whitespace-nowrap">
-        ➕ Nuovo articolo
+        class="bg-green-600 text-white px-4 py-2 h-12 rounded-lg hover:bg-green-700 transition flex items-center gap-2 whitespace-nowrap shadow-md">
+        <span class="text-xl">➕</span>
+        <span class="font-bold">Nuovo articolo</span>
       </a>
       {% endif %}
 
