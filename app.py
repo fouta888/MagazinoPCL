@@ -132,58 +132,78 @@ def logout():
 
 # -------- UTENTI --------
 # GET + POST per visualizzare e aggiungere utenti
+# -------- UTENTI --------
 @app.route("/utenti", methods=["GET", "POST"])
 @login_required
-@ruolo_required("Amministratore", "Manager")  # Admin e Manager possono accedere
+@ruolo_required("Amministratore", "Manager", "Utente")  # Ora anche l'Utente può entrare
 def utenti_view():
     db = get_db()
     cur = db.cursor()
     
+    # --- GESTIONE POST (Creazione Nuovi Utenti) ---
     if request.method == "POST":
+        # Solo Admin e Manager possono creare utenti
+        if session.get("ruolo") not in ["Amministratore", "Manager"]:
+            flash("Non hai i permessi per creare utenti.")
+            return redirect(url_for("utenti_view"))
+
         username = request.form["username"]
         password = request.form["password"]
-        ruolo_id = int(request.form["ruolo"])  # Converti in intero
+        ruolo_id = int(request.form["ruolo"])
 
-        # Recupera tutti i ruoli disponibili
         cur.execute("SELECT id, nome FROM ruoli ORDER BY id")
         tutti_ruoli = cur.fetchall()
 
-        # Determina i ruoli consentiti in base all'utente loggato
+        # Logica permessi creazione
         if session.get("ruolo") == "Amministratore":
-            ruoli_consentiti = [r[0] for r in tutti_ruoli]  # tutti i ruoli
+            ruoli_consentiti = [r[0] for r in tutti_ruoli]
         elif session.get("ruolo") == "Manager":
-            ruoli_consentiti = [r[0] for r in tutti_ruoli if r[1] == "Utente"]  # solo Utente
+            ruoli_consentiti = [r[0] for r in tutti_ruoli if r[1] == "Utente"]
         else:
             ruoli_consentiti = []
 
-        # Controlla se il ruolo selezionato è consentito
         if ruolo_id not in ruoli_consentiti:
             flash("Non puoi creare un utente con questo ruolo!")
-            db.close()
-            return redirect(url_for("utenti_view"))
-
-        # Controllo se lo username esiste già
-        cur.execute("SELECT id FROM utenti WHERE username=%s", (username,))
-        if cur.fetchone():
-            flash("Username già esistente")
         else:
-            password_hash = generate_password_hash(password)
-            cur.execute("""
-                INSERT INTO utenti (username, password_hash, ruolo_id, attivo)
-                VALUES (%s, %s, %s, TRUE)
-            """, (username, password_hash, ruolo_id))
-            db.commit()
-            flash("Utente creato correttamente")
+            cur.execute("SELECT id FROM utenti WHERE username=%s", (username,))
+            if cur.fetchone():
+                flash("Username già esistente")
+            else:
+                password_hash = generate_password_hash(password)
+                cur.execute("""
+                    INSERT INTO utenti (username, password_hash, ruolo_id, attivo)
+                    VALUES (%s, %s, %s, TRUE)
+                """, (username, password_hash, ruolo_id))
+                db.commit()
+                flash("Utente creato correttamente")
 
-    # Lista utenti e ruoli
-    cur.execute("SELECT u.id, u.username, r.nome, u.attivo FROM utenti u JOIN ruoli r ON u.ruolo_id = r.id ORDER BY u.username")
+    # --- GESTIONE GET (Visualizzazione Lista) ---
+    
+    # Se è Amministratore, scarica TUTTI gli utenti
+    if session.get("ruolo") == "Amministratore":
+        cur.execute("""
+            SELECT u.id, u.username, r.nome, u.attivo 
+            FROM utenti u 
+            JOIN ruoli r ON u.ruolo_id = r.id 
+            ORDER BY u.username
+        """)
+    # Se è Manager o Utente, scarica SOLO i dati dell'utente loggato
+    else:
+        cur.execute("""
+            SELECT u.id, u.username, r.nome, u.attivo 
+            FROM utenti u 
+            JOIN ruoli r ON u.ruolo_id = r.id 
+            WHERE u.id = %s
+        """, (session.get("user_id"),))
+    
     utenti = cur.fetchall()
+    
+    # Scarica i ruoli per il form (servono solo all'Admin/Manager)
     cur.execute("SELECT id, nome FROM ruoli ORDER BY id")
     ruoli = cur.fetchall()
     
     db.close()
     return render_template("utenti.html", utenti=utenti, ruoli=ruoli)
-
 
 @app.route("/lotti")
 @login_required
@@ -678,19 +698,31 @@ def elimina_utente(utente_id):
 
 
 
-# -------- MODIFICA / ATTIVA / DISATTIVA UTENTE --------
 @app.route("/utenti/modifica/<int:utente_id>", methods=["GET", "POST"])
 @login_required
-@ruolo_required("Amministratore")
+# Rimosso @ruolo_required("Amministratore") per permettere l'accesso all'utente
 def modifica_utente(utente_id):
     db = get_db()
     cur = db.cursor()
 
+    # SICUREZZA: Se non è admin e prova a modificare un altro ID, lo blocchiamo
+    if session.get("ruolo") != "Amministratore" and utente_id != session.get("user_id"):
+        db.close()
+        return "Accesso negato", 403
+
     if request.method == "POST":
         username = request.form.get("username")
-        ruolo_id = request.form.get("ruolo")
-        attivo = request.form.get("attivo") == "on"  # checkbox
         password = request.form.get("password")
+        
+        # Solo l'Admin può cambiare ruolo e stato attivo
+        if session.get("ruolo") == "Amministratore":
+            ruolo_id = request.form.get("ruolo")
+            attivo = request.form.get("attivo") == "on"
+        else:
+            # Per l'utente normale, recuperiamo i dati attuali (non cambiano)
+            cur.execute("SELECT ruolo_id, attivo FROM utenti WHERE id=%s", (utente_id,))
+            res = cur.fetchone()
+            ruolo_id, attivo = res[0], res[1]
 
         if password:
             password_hash = generate_password_hash(password)
@@ -708,7 +740,8 @@ def modifica_utente(utente_id):
         
         db.commit()
         db.close()
-        return redirect(url_for("utenti"))
+        # Nota: assicurati che il nome della rotta sia 'utenti_view' o 'utenti'
+        return redirect(url_for("utenti_view"))
 
     # GET: mostra form con dati dell'utente
     cur.execute("SELECT id, username, ruolo_id, attivo FROM utenti WHERE id=%s", (utente_id,))
@@ -718,7 +751,6 @@ def modifica_utente(utente_id):
     db.close()
 
     return render_template("modifica_utente.html", utente=utente, ruoli=ruoli)
-
 
 @app.route("/utenti/disattiva/<int:utente_id>")
 @login_required
@@ -1437,13 +1469,28 @@ def prodotti_pdf():
 @app.route("/movimenti/pdf")
 @login_required
 def esporta_pdf():
+    # 1. Controllo Sicurezza
+    if session.get("ruolo") != "Amministratore":
+        return "Accesso negato: solo gli amministratori possono scaricare i report.", 403
+
     tipo_filtro = request.args.get('tipo', 'tutti')
-    anno_filtro = request.args.get('anno') # Recupera l'anno (es. 2025)
+    anno_filtro = request.args.get('anno')
     
     conn = get_db()
     cur = conn.cursor()
 
-    # Query base
+    # --- LOG DOWNLOAD ---
+    try:
+        cur.execute("""
+            INSERT INTO log_download (utente_id, username, tipo_report, anno_filtro)
+            VALUES (%s, %s, %s, %s)
+        """, (session.get("user_id"), session.get("username"), tipo_filtro, anno_filtro))
+        conn.commit()
+    except Exception as e:
+        print(f"Errore registrazione log: {e}")
+    # --------------------
+
+    # Query per i movimenti (stessa di prima)
     query = """
         SELECT m.data_movimento, p.nome, m.tipo_movimento, m.quantita, l.data_scadenza
         FROM movimenti m
@@ -1452,13 +1499,9 @@ def esporta_pdf():
         WHERE 1=1
     """
     params = []
-
-    # Filtro Tipo
     if tipo_filtro != 'tutti':
         query += " AND m.tipo_movimento = %s"
         params.append(tipo_filtro)
-    
-    # Filtro Anno
     if anno_filtro:
         query += " AND EXTRACT(YEAR FROM m.data_movimento) = %s"
         params.append(int(anno_filtro))
@@ -1471,15 +1514,16 @@ def esporta_pdf():
     # Generazione PDF (FPDF)
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    titolo = f"Report Movimenti Protezione Civile Lungoni - {tipo_filtro.capitalize()}"
+    pdf.set_font("Helvetica", "B", 16)
+    
+    titolo = f"Report Movimenti PCL - {tipo_filtro.capitalize()}"
     if anno_filtro: titolo += f" Anno {anno_filtro}"
     
     pdf.cell(190, 10, titolo, ln=True, align="C")
     pdf.ln(10)
 
-    # Intestazione Tabella
-    pdf.set_font("Arial", "B", 10)
+    # Intestazione e Dati (come visti prima...)
+    pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(35, 10, "Data", 1, 0, "C", True)
     pdf.cell(65, 10, "Prodotto", 1, 0, "C", True)
@@ -1487,14 +1531,12 @@ def esporta_pdf():
     pdf.cell(20, 10, "Qta", 1, 0, "C", True)
     pdf.cell(45, 10, "Scadenza Lotto", 1, 1, "C", True)
 
-    # Dati
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("Helvetica", "", 9)
     for m in movimenti:
-        data_str = m[0].strftime('%d/%m/%Y %H:%M')
+        data_str = m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-"
         scadenza_str = m[4].strftime('%d/%m/%Y') if m[4] else "-"
-        
         pdf.cell(35, 8, data_str, 1)
-        pdf.cell(65, 8, str(m[1])[:30], 1) # Tronca nomi troppo lunghi
+        pdf.cell(65, 8, str(m[1])[:30].encode('latin-1', 'replace').decode('latin-1'), 1)
         pdf.cell(25, 8, str(m[2]).upper(), 1, 0, "C")
         pdf.cell(20, 8, str(m[3]), 1, 0, "C")
         pdf.cell(45, 8, scadenza_str, 1, 1, "C")
@@ -1504,6 +1546,19 @@ def esporta_pdf():
     filename = f"movimenti_{tipo_filtro}_{anno_filtro if anno_filtro else 'storico'}.pdf"
     response.headers['Content-Disposition'] = f'attachment; filename={filename}'
     return response
+
+
+@app.route("/admin/log_download")
+@login_required
+@ruolo_required("Amministratore")
+def visualizza_log():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC")
+    logs = cur.fetchall()
+    conn.close()
+    return render_template("admin_logs.html", logs=logs)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

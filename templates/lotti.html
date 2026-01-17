@@ -9,49 +9,33 @@
         class="flex-1 border border-gray-300 rounded-lg p-2 w-full" onkeyup="filterTable()" />
 
     <div class="flex gap-2 flex-wrap justify-center">
+        
+        {% if session.get("ruolo") == 'Amministratore' %}
         <div class="relative group">
-            <button
-                class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md">
+            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-md">
                 🖨️ Stampa PDF
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </button>
 
-            <div
-                class="absolute hidden group-hover:block bg-white border shadow-2xl rounded-xl mt-1 z-50 min-w-[220px] right-0 lg:left-0">
+            <div class="absolute hidden group-hover:block bg-white border shadow-2xl rounded-xl mt-1 z-50 min-w-[220px] right-0 lg:left-0">
                 <div class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b">Filtri Rapidi</div>
-                <a href="{{ url_for('esporta_pdf', tipo='tutti') }}" class="block px-4 py-2 hover:bg-blue-50">Tutti i
-                    movimenti</a>
-                <a href="{{ url_for('esporta_pdf', tipo='entrata') }}"
-                    class="block px-4 py-2 hover:bg-green-50 text-green-700 font-medium">Solo Entrate</a>
-                <a href="{{ url_for('esporta_pdf', tipo='uscita') }}"
-                    class="block px-4 py-2 hover:bg-red-50 text-red-700 font-medium border-b">Solo Uscite</a>
-
-                <div class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b">Archivio Annuale
+                <a href="{{ url_for('esporta_pdf', tipo='tutti') }}" class="block px-4 py-2 hover:bg-blue-50">Tutti i movimenti</a>
                 </div>
-
-                {% if anni_report %}
-                {% for anno in anni_report %}
-                <a href="{{ url_for('esporta_pdf', tipo='tutti', anno=anno) }}"
-                    class="block px-4 py-2 hover:bg-gray-100">
-                    Report Anno {{ anno }}
-                </a>
-                {% endfor %}
-                {% else %}
-                <span class="block px-4 py-2 text-gray-400 italic text-sm">Nessun movimento registrato</span>
-                {% endif %}
-            </div>
         </div>
+        {% endif %}
 
+        {% if session.get("ruolo") in ['Amministratore', 'Manager'] %}
         <a href="{{ url_for('carico_lotto') }}"
-            class="bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
             ➕ Aggiungi
         </a>
 
         <a href="{{ url_for('uscita_lotto') }}" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
             ➖ Scarico FIFO
         </a>
+        {% endif %}
     </div>
 </div>
 

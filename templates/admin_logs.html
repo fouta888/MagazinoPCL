@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-yellow-400">Registro Download Report</h1>
+    <a href="{{ url_for('dashboard') }}"
+        class="text-sm bg-gray-700 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition">
+        ← Torna alla Dashboard
+    </a>
+</div>
+
+<div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
+    <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <p class="text-sm text-gray-500 font-medium italic">
+            Nota: Questo registro è visibile solo agli Amministratori e traccia ogni generazione di file PDF.
+        </p>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-800 text-gray-100 uppercase text-xs">
+                <tr>
+                    <th class="px-6 py-4">Data e Ora</th>
+                    <th class="px-6 py-4">Operatore</th>
+                    <th class="px-6 py-4">Tipo Report</th>
+                    <th class="px-6 py-4">Anno Filtrato</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-800">
+                {% for log in logs %}
+                <tr class="hover:bg-blue-50 transition-colors">
+                    <td class="px-6 py-4 font-mono text-gray-600">
+                        {{ log[3].strftime('%d/%m/%Y %H:%M:%S') }}
+                    </td>
+                    <td class="px-6 py-4 font-bold text-blue-700">
+                        {{ log[0] }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded-md text-xs font-bold 
+                            {% if log[1] == 'entrata' %} bg-green-100 text-green-700 
+                            {% elif log[1] == 'uscita' %} bg-red-100 text-red-700 
+                            {% else %} bg-blue-100 text-blue-700 {% endif %}">
+                            {{ log[1].upper() }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {{ log[2] if log[2] else 'Storico Completo' }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-6 py-10 text-center text-gray-400 italic">
+                        Nessun download registrato finora.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
