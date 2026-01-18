@@ -77,37 +77,30 @@
 
 <script>
     const chatBox = document.getElementById("chat-box");
-    // Usiamo le virgolette per far star zitto l'errore di VS Code
-    const destId = "{{ dest_id }}";
+    // Usiamo Jinja per passare l'ID, ma gestiamo il caso in cui sia nullo
+    const destId = "{{ dest_id if dest_id else '' }}";
 
     function scrollBottom() {
-        if (chatBox) {
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+        if (chatBox) { chatBox.scrollTop = chatBox.scrollHeight; }
     }
 
     function fetchMessages() {
-        if (!destId) return; // Non fare nulla se non c'è un destinatario
+        // Se non abbiamo un destinatario selezionato, non fare la chiamata AJAX
+        if (!destId || destId === "") return;
 
         fetch(`/api/get_messages/${destId}`)
             .then(response => response.text())
             .then(html => {
                 const isAtBottom = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 50;
-                
                 chatBox.innerHTML = html;
-
-                if (isAtBottom) {
-                    scrollBottom();
-                }
-            })
-            .catch(err => console.error("Errore recupero messaggi:", err));
+                if (isAtBottom) scrollBottom();
+            });
     }
 
-    // Avvia il recupero ogni 3 secondi
-    setInterval(fetchMessages, 3000);
-
-    // Esegui lo scroll iniziale
-    scrollBottom();
+    if (destId) {
+        setInterval(fetchMessages, 3000);
+        scrollBottom();
+    }
 </script>
 
 {% endblock %}

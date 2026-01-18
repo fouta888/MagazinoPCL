@@ -513,59 +513,28 @@ def elimina_lotto(lotto_id):
 
 
 # -------- MESSAGGI --------
-@app.route("/messaggi", methods=["GET", "POST"])
+@app.route("/messaggi")
 @login_required
 @ruolo_required("Amministratore", "Manager")
 def messaggi():
     db = get_db()
     cur = db.cursor()
-
     user_id = session["user_id"]
 
-    if request.method == "POST":
-        destinatario_id = request.form.get("destinatario_id")
-        contenuto = request.form.get("contenuto")
-
-        if destinatario_id and contenuto:
-            cur.execute("""
-                INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
-                VALUES (%s, %s, %s)
-            """, (user_id, destinatario_id, contenuto))
-            db.commit()
-            flash("Messaggio inviato!")
-
-    # Utenti Admin / Manager
+    # Prendi la lista utenti per la sidebar
     cur.execute("""
         SELECT u.id, u.username
         FROM utenti u
         JOIN ruoli r ON u.ruolo_id = r.id
         WHERE r.nome IN ('Amministratore', 'Manager')
-          AND u.attivo = TRUE
+          AND u.attivo=TRUE
           AND u.id != %s
     """, (user_id,))
     utenti = cur.fetchall()
-
-    # Messaggi
-    cur.execute("""
-        SELECT m.id, m.contenuto, m.data_creazione,
-               mittente.username,
-               destinatario.username
-        FROM messaggi m
-        JOIN utenti mittente ON m.mittente_id = mittente.id
-        JOIN utenti destinatario ON m.destinatario_id = destinatario.id
-        WHERE m.mittente_id=%s OR m.destinatario_id=%s
-        ORDER BY m.data_creazione DESC
-    """, (user_id, user_id))
-
-    messaggi_list = cur.fetchall()
     db.close()
 
-    return render_template(
-        "messaggi.html",
-        utenti=utenti,
-        messaggi=messaggi_list
-    )
-
+    # Mostriamo la pagina senza messaggi e senza destinatario_id
+    return render_template("chat_privata.html", utenti=utenti, messaggi=[], destinatario=None, dest_id=None)
 
 
 @app.route("/messaggi/<int:dest_id>", methods=["GET", "POST"])

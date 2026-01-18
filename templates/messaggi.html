@@ -8,8 +8,9 @@
         <h3 class="p-4 font-bold border-b bg-gray-50">Conversazioni</h3>
         {% for u in utenti %}
         <a href="{{ url_for('chat_privata', dest_id=u[0]) }}"
-            class="p-4 hover:bg-gray-100 border-b {{ 'bg-blue-50' if dest_id == u[0] else '' }}">
+            class="p-4 hover:bg-gray-100 border-b {{ 'bg-green-50' if dest_id == u[0] else '' }}">
             <div class="font-semibold">{{ u[1] }}</div>
+            <div class="text-xs text-gray-500">Invia messaggio</div>
         </a>
         {% endfor %}
     </aside>
