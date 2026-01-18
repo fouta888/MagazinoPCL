@@ -630,35 +630,55 @@ def chat_privata(dest_id):
 @ruolo_required("Amministratore")
 def broadcast():
     contenuto = request.form.get("contenuto")
-    if not contenuto:
-        flash("Messaggio vuoto")
-        return redirect(url_for("messaggi"))
+    user_id = session["user_id"]
+    
+    if contenuto:
+        db = get_db()
+        cur = db.cursor()
+        # Prendi tutti gli utenti Admin e Manager tranne te stesso
+        cur.execute("""
+            SELECT u.id FROM utenti u 
+            JOIN ruoli r ON u.ruolo_id = r.id 
+            WHERE r.nome IN ('Amministratore', 'Manager') AND u.id != %s
+        """, (user_id,))
+        destinatari = cur.fetchall()
+        
+        for dest in destinatari:
+            cur.execute("""
+                INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
+                VALUES (%s, %s, %s)
+            """, (user_id, dest[0], contenuto))
+        
+        db.commit()
+        db.close()
+        flash(f"Messaggio inviato a {len(destinatari)} utenti!")
+    
+    return redirect(url_for('messaggi'))
 
+
+@app.route("/api/get_messages/<int:dest_id>")
+@login_required
+def get_messages_ajax(dest_id):
     db = get_db()
     cur = db.cursor()
+    user_id = session["user_id"]
 
     cur.execute("""
-        SELECT u.id
-        FROM utenti u
-        JOIN ruoli r ON u.ruolo_id = r.id
-        WHERE r.nome='Manager' AND u.attivo=TRUE
-    """)
-
-    manager_ids = cur.fetchall()
-
-    for (uid,) in manager_ids:
-        cur.execute("""
-            INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
-            VALUES (%s, %s, %s)
-        """, (session["user_id"], uid, contenuto))
-
-    db.commit()
+        SELECT m.contenuto, m.data_creazione,
+               mittente.username, destinatario.username
+        FROM messaggi m
+        JOIN utenti mittente ON m.mittente_id = mittente.id
+        JOIN utenti destinatario ON m.destinatario_id = destinatario.id
+        WHERE (m.mittente_id=%s AND m.destinatario_id=%s)
+           OR (m.mittente_id=%s AND m.destinatario_id=%s)
+        ORDER BY m.data_creazione
+    """, (user_id, dest_id, dest_id, user_id))
+    
+    messaggi = cur.fetchall()
     db.close()
-
-    flash("Messaggio inviato a tutti i Manager")
-    return redirect(url_for("messaggi"))
-
-
+    
+    # Restituiamo solo il pezzettino dei messaggi
+    return render_template("partials/messages_list.html", messaggi=messaggi)
 
 
 @app.route("/movimenti/elimina/<int:movimento_id>")

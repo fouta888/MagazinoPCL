@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex flex-col md:flex-row h-[80vh] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+
+    <aside class="w-full md:w-1/4 bg-gray-50 border-r border-gray-200 flex flex-col">
+        <div class="p-4 bg-white border-b shadow-sm">
+            <h3 class="font-bold text-gray-700 flex items-center gap-2">
+                <i class="fas fa-users text-green-600"></i> Collaboratori
+            </h3>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+            {% for u in utenti %}
+            <a href="{{ url_for('chat_privata', dest_id=u[0]) }}"
+                class="block p-4 border-b hover:bg-white transition-all {{ 'bg-green-50 border-l-4 border-l-green-600' if dest_id == u[0] else 'text-gray-600' }}">
+                <div class="font-semibold">{{ u[1] }}</div>
+                <div class="text-xs opacity-70">Clicca per chattare</div>
+            </a>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col bg-white">
+
+        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm">
+            <div>
+                <span class="text-sm text-gray-500 text-xs block">Stai parlando con:</span>
+                <span class="font-bold text-lg text-gray-800">{{ destinatario[0] }}</span>
+            </div>
+
+            {% if session.get("ruolo") == "Amministratore" %}
+            <form method="POST" action="{{ url_for('broadcast') }}" class="hidden lg:flex items-center gap-2">
+                <input name="contenuto" required placeholder="Avviso a tutti i Manager..."
+                    class="border rounded-full px-4 py-1 text-sm focus:ring-2 focus:ring-red-500 outline-none w-64">
+                <button
+                    class="bg-red-600 text-white px-4 py-1 rounded-full hover:bg-red-700 text-sm font-bold shadow-md transition">
+                    <i class="fas fa-bullhorn"></i> Broadcast
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-4 bg-[#f0f2f5]">
+            {% for m in messaggi %}
+            {% set is_me = (m[2] == session.get("username")) %}
+            <div class="flex {{ 'justify-end' if is_me else 'justify-start' }}">
+                <div
+                    class="max-w-[75%] rounded-2xl px-4 py-2 shadow-sm
+                        {{ 'bg-green-600 text-white rounded-tr-none' if is_me else 'bg-white text-gray-800 border rounded-tl-none' }}">
+
+                    <div class="text-[10px] mb-1 opacity-70 font-bold uppercase tracking-wider">
+                        {{ m[2] }} • {{ m[1].strftime("%H:%M") }}
+                    </div>
+
+                    <div class="text-sm leading-relaxed">
+                        {{ m[0] }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            <div id="scroll-anchor"></div>
+        </div>
+
+        <div class="p-4 bg-gray-50 border-t">
+            <form method="POST" class="flex gap-3">
+                <input name="contenuto" required autocomplete="off"
+                    placeholder="Scrivi un messaggio a {{ destinatario[0] }}..."
+                    class="flex-1 border border-gray-300 rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-inner">
+                <button
+                    class="bg-green-600 hover:bg-green-700 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </main>
+</div>
+
+<script>
+    const chatBox = document.getElementById("chat-box");
+    // Usiamo le virgolette per far star zitto l'errore di VS Code
+    const destId = "{{ dest_id }}";
+
+    function scrollBottom() {
+        if (chatBox) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+
+    function fetchMessages() {
+        if (!destId) return; // Non fare nulla se non c'è un destinatario
+
+        fetch(`/api/get_messages/${destId}`)
+            .then(response => response.text())
+            .then(html => {
+                const isAtBottom = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 50;
+                
+                chatBox.innerHTML = html;
+
+                if (isAtBottom) {
+                    scrollBottom();
+                }
+            })
+            .catch(err => console.error("Errore recupero messaggi:", err));
+    }
+
+    // Avvia il recupero ogni 3 secondi
+    setInterval(fetchMessages, 3000);
+
+    // Esegui lo scroll iniziale
+    scrollBottom();
+</script>
+
+{% endblock %}

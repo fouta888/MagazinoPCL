@@ -1,0 +1,12 @@
+{% for m in messaggi %}
+    {% set is_me = (m[2] == session.get("username")) %}
+    <div class="flex {{ 'justify-end' if is_me else 'justify-start' }}">
+        <div class="max-w-[75%] rounded-2xl px-4 py-2 shadow-sm
+            {{ 'bg-green-600 text-white rounded-tr-none' if is_me else 'bg-white text-gray-800 border rounded-tl-none' }}">
+            <div class="text-[10px] mb-1 opacity-70 font-bold uppercase tracking-wider">
+                {{ m[2] }} • {{ m[1].strftime("%H:%M") }}
+            </div>
+            <div class="text-sm leading-relaxed">{{ m[0] }}</div>
+        </div>
+    </div>
+{% endfor %}

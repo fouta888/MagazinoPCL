@@ -5,11 +5,11 @@
 
     <!-- LISTA UTENTI (desktop) -->
     <aside class="hidden md:flex md:flex-col w-full md:w-1/3 border-r overflow-y-auto">
-        <h3 class="p-4 font-bold border-b">Conversazioni</h3>
+        <h3 class="p-4 font-bold border-b bg-gray-50">Conversazioni</h3>
         {% for u in utenti %}
-        <a href="{{ url_for('messaggi', destinatario_id=u[0]) }}" class="p-4 hover:bg-gray-100 cursor-pointer border-b">
+        <a href="{{ url_for('chat_privata', dest_id=u[0]) }}"
+            class="p-4 hover:bg-gray-100 border-b {{ 'bg-blue-50' if dest_id == u[0] else '' }}">
             <div class="font-semibold">{{ u[1] }}</div>
-            <div class="text-sm text-gray-500">Clicca per scrivere</div>
         </a>
         {% endfor %}
     </aside>
