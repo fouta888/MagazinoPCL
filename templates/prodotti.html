@@ -38,13 +38,6 @@
       </a>
       {% endif %}
 
-      {% if session.get("ruolo") == "Amministratore" %}
-      <a href="{{ url_for('prodotti_pdf') }}" target="_blank"
-        class="bg-green-600 text-white px-4 py-2 h-12 rounded-lg hover:bg-gray-700 transition flex items-center gap-2 whitespace-nowrap">
-        <span>🖨️</span>
-        <span class="hidden sm:inline">Stampa PDF</span>
-      </a>
-      {% endif %}
     </div>
 
     <!-- Filtro scadenza -->

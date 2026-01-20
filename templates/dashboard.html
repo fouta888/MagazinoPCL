@@ -30,7 +30,7 @@
   {% endif %}
 
   {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
-  <button onclick="openDrawer('scadenzeDrawer')"
+  <button onclick="openDrawer('scadenzeDrawerTemplate')"
     class="bg-yellow-100 hover:bg-yellow-200 rounded-xl shadow p-3 h-24 flex flex-col items-center justify-center transition border-b-4 border-yellow-500">
     <span class="text-2xl">⚠️</span>
     <p class="text-xs uppercase text-gray-600 font-bold">Scadenze</p>
@@ -39,7 +39,7 @@
   {% endif %}
 
   {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
-  <button onclick="openDrawer('listaSpesaDrawer')"
+  <button onclick="openDrawer('listaSpesaDrawerTemplate')"
     class="bg-orange-100 hover:bg-orange-200 rounded-xl shadow p-3 h-24 flex flex-col items-center justify-center transition border-b-4 border-orange-500">
     <span class="text-2xl">🛒</span>
     <p class="text-xs uppercase text-gray-600 font-bold">Lista Spesa</p>
@@ -50,59 +50,61 @@
 </section>
 
 <div id="drawerOverlay" onclick="closeDrawer()" class="fixed inset-0 bg-black/40 hidden z-40"></div>
-
 <div id="drawer"
   class="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl transform translate-y-full transition-transform duration-300 z-50 max-h-[80vh] overflow-y-auto">
-  <div class="p-4 border-b flex justify-between items-center">
+  <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
     <h2 id="drawerTitle" class="font-bold text-lg"></h2>
-    <button onclick="closeDrawer()" class="text-2xl">✖</button>
+    <button onclick="closeDrawer()" class="text-2xl p-2">&times;</button>
   </div>
   <div id="drawerContent" class="p-4"></div>
 </div>
 
-<template id="scadenzeDrawer">
-  <ul class="text-sm space-y-2">
+<template id="scadenzeDrawerTemplate">
+  <ul class="space-y-3">
     {% for l in lotti_in_scadenza %}
     <li class="border-b pb-2">
-      🧪 <strong>{{ l[1] }}</strong><br>
-      Q.tà {{ l[2] }} – <span class="text-red-600">{{ l[3] }}</span>
+      <div class="font-bold text-gray-800">📦 {{ l[1] }}</div>
+      <div class="text-sm text-gray-600">Quantità: {{ l[2] }}</div>
+      <div class="text-sm font-bold text-red-600">Scadenza: {{ l[3].strftime('%d/%m/%Y') if l[3] else 'N/D' }}</div>
     </li>
+    {% else %}
+    <li class="text-center py-4 text-gray-500 italic">Nessun lotto in scadenza.</li>
     {% endfor %}
   </ul>
 </template>
 
-<template id="listaSpesaDrawer">
+<template id="listaSpesaDrawerTemplate">
   <div class="mb-4 flex justify-end">
     <button onclick="copyListaWhatsApp()"
-      class="bg-green-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-green-700 transition">
-      📋 Copia per WhatsApp
+      class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2">
+      <i class="fab fa-whatsapp"></i> Copia per WhatsApp
     </button>
   </div>
-  <ul class="text-sm space-y-3">
+  <ul class="space-y-4" id="whatsapp-list-source">
     {% for p in prodotti_sotto_soglia %}
     <li class="border-b pb-2 flex justify-between items-center">
       <div>
-        <strong>{{ p[0] }}</strong><br>
-        <span class="text-xs text-gray-500 italic text-red-500">Soglia min: {{ p[2] }}</span>
+        <strong class="prodotto-nome">{{ p[0] }}</strong><br>
+        <span class="text-xs text-gray-400">Soglia min: {{ p[2] }}</span>
       </div>
-      <div class="text-right font-bold text-lg">
+      <div class="text-right font-bold text-lg text-orange-600">
         {{ p[1] }}
       </div>
     </li>
     {% else %}
-    <li class="text-center py-4 text-green-600 font-bold italic text-lg">✅ Scorte in regola!</li>
+    <li class="text-center py-10 text-green-600 font-bold italic">✅ Scorte in regola!</li>
     {% endfor %}
   </ul>
 </template>
 
-<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-  <div class="bg-white rounded-xl shadow flex flex-col">
-    <div class="px-6 py-3 border-b font-semibold text-gray-700">Prodotti per Categoria</div>
-    <div class="relative h-[330px] p-4"><canvas id="prodottiChart"></canvas></div>
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+  <div class="bg-white rounded-xl shadow p-4 h-[400px]">
+    <h3 class="font-semibold text-gray-700 mb-4 border-b pb-2">Prodotti per Categoria</h3>
+    <canvas id="prodottiChart"></canvas>
   </div>
-  <div class="bg-white rounded-xl shadow flex flex-col">
-    <div class="px-6 py-3 border-b font-semibold text-gray-700">Movimenti Ultimi 7 Giorni</div>
-    <div class="relative h-[330px] p-4"><canvas id="movimentiChart"></canvas></div>
+  <div class="bg-white rounded-xl shadow p-4 h-[400px]">
+    <h3 class="font-semibold text-gray-700 mb-4 border-b pb-2">Movimenti Ultimi 7 Giorni</h3>
+    <canvas id="movimentiChart"></canvas>
   </div>
 </section>
 
@@ -120,17 +122,20 @@
   // GESTIONE DRAWER
   function openDrawer(templateId) {
     const template = document.getElementById(templateId);
-    document.getElementById("drawerContent").innerHTML = template.innerHTML;
+    const content = document.getElementById("drawerContent");
+    const drawer = document.getElementById("drawer");
+    const overlay = document.getElementById("drawerOverlay");
+
+    content.innerHTML = template.innerHTML;
 
     const titles = {
-      'scadenzeDrawer': '⚠️ Lotti in Scadenza',
-      'listaSpesaDrawer': '🛒 Lista della Spesa (Sotto Soglia)',
-      'esaurimentoDrawer': '📉 Previsione Esaurimento'
+      'scadenzeDrawerTemplate': '⚠️ Lotti in Scadenza',
+      'listaSpesaDrawerTemplate': '🛒 Lista della Spesa'
     };
 
     document.getElementById("drawerTitle").innerText = titles[templateId] || "Dettagli";
-    document.getElementById("drawerOverlay").classList.remove("hidden");
-    document.getElementById("drawer").classList.remove("translate-y-full");
+    overlay.classList.remove("hidden");
+    drawer.classList.remove("translate-y-full");
   }
 
   function closeDrawer() {
@@ -138,56 +143,85 @@
     document.getElementById("drawerOverlay").classList.add("hidden");
   }
 
-  // FUNZIONE COPIA WHATSAPP
+  // WHATSAPP
   function copyListaWhatsApp() {
-    let testo = "*📦 LISTA SPESA PROTEZIONE CIVILE*\n";
-    testo += "Aggiornata al: " + new Date().toLocaleDateString() + "\n\n";
+    let testo = "*📦 LISTA SPESA MAGAZZINO*\n";
+    testo += "Data: " + new Date().toLocaleDateString('it-IT') + "\n\n";
 
+    // Seleziona solo i nomi dei prodotti e le quantità
     const items = document.querySelectorAll("#drawerContent li");
+    let hasItems = false;
+
     items.forEach(item => {
-      if (!item.innerText.includes("Scorte in regola")) {
-        // Pulizia del testo per formattazione pulita
-        let righe = item.innerText.split('\n').map(s => s.trim()).filter(s => s !== "");
-        testo += "• *" + righe[0] + "* (Disp: " + righe[2] + ")\n";
+      const nome = item.querySelector('.prodotto-nome');
+      const qta = item.querySelector('.text-right');
+      if (nome && qta) {
+        testo += "• *" + nome.innerText.trim() + "* (Disp: " + qta.innerText.trim() + ")\n";
+        hasItems = true;
       }
     });
 
+    if (!hasItems) {
+      alert("La lista è vuota!");
+      return;
+    }
+
     navigator.clipboard.writeText(testo).then(() => {
-      alert("✅ Lista copiata! Ora incollala su WhatsApp.");
+      alert("✅ Lista copiata! Incollala su WhatsApp.");
     });
   }
 
-  // GRAFICI CHART.JS
+  // CHARTS
+  // CHARTS
   document.addEventListener('DOMContentLoaded', function () {
-    const data = JSON.parse(document.getElementById('dashboard-data').textContent);
+    const dataElement = document.getElementById('dashboard-data');
+    if (!dataElement) return;
+    const data = JSON.parse(dataElement.textContent);
 
-    const ctxP = document.getElementById('prodottiChart').getContext('2d');
-    new Chart(ctxP, {
-      type: 'bar',
+    // GRAFICO A TORTA (PIE CHART)
+    new Chart(document.getElementById('prodottiChart'), {
+      type: 'pie',
       data: {
         labels: data.categorie_labels,
         datasets: [{
-          label: 'Quantità',
           data: data.categorie_quantita,
-          backgroundColor: 'rgba(59, 130, 246, 0.6)',
-          borderColor: 'rgb(59, 130, 246)',
-          borderWidth: 1
+          backgroundColor: [
+            '#4f46e5', '#10b981', '#f59e0b', '#ef4444',
+            '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'
+          ],
+          borderWidth: 2,
+          borderColor: '#ffffff'
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom', // Sposta la legenda sotto per dare più spazio al cerchio
+            labels: { boxWidth: 12, padding: 15 }
+          }
+        }
+      }
     });
 
-    const ctxM = document.getElementById('movimentiChart').getContext('2d');
-    new Chart(ctxM, {
+    // GRAFICO MOVIMENTI (LINEA) - Resta uguale
+    new Chart(document.getElementById('movimentiChart'), {
       type: 'line',
       data: {
         labels: data.movimenti_labels,
         datasets: [
-          { label: 'Entrate', data: data.movimenti_entrata, borderColor: 'rgb(34, 197, 94)', tension: 0.3 },
-          { label: 'Uscite', data: data.movimenti_uscita, borderColor: 'rgb(239, 68, 68)', tension: 0.3 }
+          { label: 'Entrate', data: data.movimenti_entrata, borderColor: '#22c55e', backgroundColor: '#22c55e', tension: 0.3 },
+          { label: 'Uscite', data: data.movimenti_uscita, borderColor: '#ef4444', backgroundColor: '#ef4444', tension: 0.3 }
         ]
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
     });
   });
 </script>

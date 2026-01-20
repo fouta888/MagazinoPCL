@@ -29,9 +29,9 @@
 
   <div class="min-h-screen flex">
     <!-- CONTENUTO PRINCIPALE -->
-  <main class="flex-1 max-w-7xl mx-auto mt-2 w-full px-4 sm:px-6 lg:px-8 py-6">
-    {% block content %}{% endblock %}
-  </main>
+    <main class="flex-1 max-w-7xl mx-auto mt-2 w-full px-4 sm:px-6 lg:px-8 py-6">
+      {% block content %}{% endblock %}
+    </main>
   </div>
 
   <!-- Footer fisso -->
@@ -49,6 +49,15 @@
         <a href="{{ url_for('prodotti_view') }}" class="hover:text-yellow-400 transition text-sm">Prodotti</a>
         <a href="{{ url_for('categorie_view') }}" class="hover:text-yellow-400 transition text-sm">Categorie</a>
         <a href="{{ url_for('movimenti_view') }}" class="hover:text-yellow-400 transition text-sm">Movimenti</a>
+        <a href="{{ url_for('lista_spesa') }}" class="relative inline-block">
+          <i class="fas fa-shopping-cart text-xl"></i>
+          {% if prodotti_sotto_soglia|length > 0 %}
+          <span
+            class="absolute -top-2 -right-2 bg-orange-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+            {{ prodotti_sotto_soglia|length }}
+          </span>
+          {% endif %}
+        </a>
       </div>
 
     </div>
