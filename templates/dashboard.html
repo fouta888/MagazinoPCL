@@ -22,11 +22,28 @@
     <p class="text-xs text-gray-500 uppercase font-bold">Utenti Attivi</p>
     <p class="text-3xl font-bold text-blue-600">{{ utenti_attivi }}</p>
   </div>
-  {% else %}
-  <div class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-gray-300">
-    <p class="text-xs text-gray-500 uppercase font-bold">Stato Sistema</p>
-    <p class="text-sm font-bold text-gray-600 uppercase italic">Operativo</p>
+
+  <div class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-green-500">
+    <p class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Stato Sistema</p>
+
+    <div class="flex items-center justify-center gap-2 mt-1">
+      <span class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+      </span>
+      <p class="text-sm font-black text-green-600 uppercase italic">Operativo</p>
+    </div>
+
+    <div class="mt-2 flex flex-col gap-0.5">
+      <p class="text-[9px] text-gray-400 font-semibold">
+        <i class="fas fa-users"></i> {{ utenti_attivi }} Utenti registrati
+      </p>
+      <p class="text-[9px] text-gray-400 font-semibold">
+        <i class="fas fa-clock"></i> Ultimo movimento: {{ ultimo_aggiornamento }}
+      </p>
+    </div>
   </div>
+  {% else %}
   {% endif %}
 
   {% if session.get("ruolo") in ["Amministratore", "Manager"] %}

@@ -782,6 +782,11 @@ def dashboard():
 
     cur.execute("SELECT COUNT(*) FROM utenti WHERE attivo = TRUE")
     utenti_attivi = cur.fetchone()[0]
+    # AGGIUNTA: Prendi l'orario dell'ultimo movimento (carico/scarico)
+    cur.execute("SELECT data_movimento FROM movimenti ORDER BY data_movimento DESC LIMIT 1")
+    ultimo_mov_row = cur.fetchone()
+    # Formattiamo l'ora se esiste un movimento, altrimenti mettiamo un trattino
+    ultimo_aggiornamento = ultimo_mov_row[0].strftime("%H:%M") if ultimo_mov_row else "--:--"
 
     # ==========================================
     # NOVITÀ: PRODOTTI SOTTO SOGLIA (LISTA SPESA)
@@ -875,7 +880,9 @@ def dashboard():
         prodotti_sotto_soglia=prodotti_sotto_soglia, # <--- FONDAMENTALE PER IL DRAWER
         categorie_labels=categorie_labels,
         categorie_quantita=categorie_quantita,
-        movimenti_trend=movimenti_trend
+        movimenti_trend=movimenti_trend,
+        ultimo_aggiornamento=ultimo_aggiornamento,
+        stato_db="Online" # Stato fisso a Online se la pagina carica
     )
 
 def controlla_scadenze():
