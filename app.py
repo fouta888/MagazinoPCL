@@ -790,8 +790,9 @@ def dashboard():
     cur.execute("""
         SELECT nome, quantita, quantita_minima 
         FROM prodotti 
-        WHERE quantita < quantita_minima 
+        WHERE quantita <= quantita_minima 
           AND quantita_minima > 0
+          AND attivo = TRUE
         ORDER BY nome ASC
     """)
     prodotti_sotto_soglia = cur.fetchall()
@@ -1069,6 +1070,25 @@ def elimina_prodotto(prodotto_id):
     db.close()
     return redirect(url_for("prodotti_view"))
 
+
+@app.route("/lista_spesa")
+@login_required
+def lista_spesa():
+    db = get_db()
+    cur = db.cursor()
+    
+    # Cerchiamo i prodotti sotto soglia (escludendo quelli con minima a 0 se preferisci)
+    cur.execute("""
+        SELECT id, nome, quantita, quantita_minima, posizione
+        FROM prodotti
+        WHERE quantita <= quantita_minima 
+          AND attivo = TRUE
+        ORDER BY posizione ASC
+    """)
+    prodotti_bassi = cur.fetchall()
+    db.close()
+    
+    return render_template("lista_spesa.html", prodotti=prodotti_bassi)
 
 # -------- CATEGORIE --------
 @app.route("/categorie")
@@ -1531,6 +1551,18 @@ def visualizza_log():
     logs = cur.fetchall()
     conn.close()
     return render_template("admin_logs.html", logs=logs)
+
+
+@app.context_processor
+def inject_globals():
+    if "user_id" in session:
+        db = get_db()
+        cur = db.cursor()
+        cur.execute("SELECT COUNT(*) FROM prodotti WHERE quantita <= quantita_minima AND attivo = TRUE")
+        count = cur.fetchone()[0]
+        db.close()
+        return dict(global_count_spesa=count)
+    return dict(global_count_spesa=0)
 
 
 if __name__ == "__main__":
