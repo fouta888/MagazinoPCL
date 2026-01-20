@@ -1073,6 +1073,7 @@ def elimina_prodotto(prodotto_id):
 
 @app.route("/lista_spesa")
 @login_required
+@ruolo_required("Amministratore", "Manager")
 def lista_spesa():
     db = get_db()
     cur = db.cursor()
