@@ -1,73 +1,57 @@
 {% extends "base.html" %}
-{% block content %}
 
-<div class="flex flex-col md:flex-row h-[80vh] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+{% block footer_block %}
+{% endblock %} {% block content %}
 
-    <aside class="w-full md:w-1/4 bg-gray-50 border-r border-gray-200 flex flex-col">
-        <div class="p-4 bg-white border-b shadow-sm">
-            <h3 class="font-bold text-gray-700 flex items-center gap-2">
-                <i class="fas fa-users text-green-600"></i> Collaboratori
-            </h3>
+<div class="flex flex-col md:flex-row h-[calc(100vh-100px)] md:h-[85vh] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+
+    <aside class="hidden md:flex flex-col w-1/3 border-r bg-gray-50 h-full">
+        <div class="p-4 font-bold border-b bg-white">
+            <span><i class="fas fa-users text-green-600"></i> Collaboratori</span>
         </div>
         <div class="flex-1 overflow-y-auto">
             {% for u in utenti %}
             <a href="{{ url_for('chat_privata', dest_id=u[0]) }}"
-                class="block p-4 border-b hover:bg-white transition-all {{ 'bg-green-50 border-l-4 border-l-green-600' if dest_id == u[0] else 'text-gray-600' }}">
+                class="block p-4 hover:bg-white border-b {{ 'bg-green-100 border-l-4 border-green-600' if dest_id == u[0] else '' }}">
                 <div class="font-semibold">{{ u[1] }}</div>
-                <div class="text-xs opacity-70">Clicca per chattare</div>
             </a>
             {% endfor %}
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col bg-white">
-
-        <div class="p-4 border-b flex justify-between items-center bg-white shadow-sm">
+    <main class="flex-1 flex flex-col bg-white h-full min-h-0">
+        
+        <div class="p-3 border-b flex items-center bg-gray-50 shrink-0">
+            <a href="{{ url_for('messaggi') }}" class="md:hidden text-green-600 mr-4 p-2">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
             <div>
-                <span class="text-sm text-gray-500 text-xs block">Stai parlando con:</span>
-                <span class="font-bold text-lg text-gray-800">{{ destinatario[0] }}</span>
+                <span class="font-bold text-gray-800 leading-none block">{{ destinatario[0] }}</span>
+                <span class="text-[10px] text-green-500 font-bold uppercase">Chat Privata</span>
             </div>
-
-            {% if session.get("ruolo") == "Amministratore" %}
-            <form method="POST" action="{{ url_for('broadcast') }}" class="hidden lg:flex items-center gap-2">
-                <input name="contenuto" required placeholder="Avviso a tutti i Manager..."
-                    class="border rounded-full px-4 py-1 text-sm focus:ring-2 focus:ring-red-500 outline-none w-64">
-                <button
-                    class="bg-red-600 text-white px-4 py-1 rounded-full hover:bg-red-700 text-sm font-bold shadow-md flex items-center gap-2">
-                    <i class="fas fa-bullhorn animate-pulse"></i> Broadcast
-                </button>
-            </form>
-            {% endif %}
         </div>
 
-        <div id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-4 bg-[#f0f2f5]">
+        <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f0f2f5] flex flex-col-reverse">
             {% for m in messaggi %}
-            {% set is_me = (m[2] == session.get("username")) %}
-            <div class="flex {{ 'justify-end' if is_me else 'justify-start' }}">
-                <div
-                    class="max-w-[75%] rounded-2xl px-4 py-2 shadow-sm
+                {% set is_me = (m[2] == session.get("username") or m[3] == session.get("username")) %}
+                <div class="flex {{ 'justify-end' if is_me else 'justify-start' }}">
+                    <div class="max-w-[85%] rounded-2xl px-4 py-2 shadow-sm
                         {{ 'bg-green-600 text-white rounded-tr-none' if is_me else 'bg-white text-gray-800 border rounded-tl-none' }}">
-
-                    <div class="text-[10px] mb-1 opacity-70 font-bold uppercase tracking-wider">
-                        {{ m[2] }} • {{ m[1].strftime("%H:%M") }}
-                    </div>
-
-                    <div class="text-sm leading-relaxed">
-                        {{ m[0] }}
+                        <div class="text-[10px] mb-1 opacity-70 font-bold uppercase">
+                            {{ m[3] if m[3] is defined else m[2] }} • {{ m[1].strftime("%H:%M") if m[1].strftime is defined else m[2] }}
+                        </div>
+                        <div class="text-sm break-words">{{ m[0] if m[0] is defined else m[1] }}</div>
                     </div>
                 </div>
-            </div>
             {% endfor %}
-            <div id="scroll-anchor"></div>
         </div>
 
-        <div class="p-4 bg-gray-50 border-t">
-            <form method="POST" class="flex gap-3">
+        <div class="p-3 bg-white border-t shrink-0 sticky bottom-0">
+            <form method="POST" class="flex gap-2">
                 <input name="contenuto" required autocomplete="off"
-                    placeholder="Scrivi un messaggio a {{ destinatario[0] }}..."
-                    class="flex-1 border border-gray-300 rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-inner">
-                <button
-                    class="bg-green-600 hover:bg-green-700 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95">
+                    placeholder="Scrivi messaggio..."
+                    class="flex-1 border border-gray-300 rounded-full px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-green-500 shadow-inner">
+                <button type="submit" class="bg-green-600 text-white w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-lg">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </form>
@@ -77,30 +61,10 @@
 
 <script>
     const chatBox = document.getElementById("chat-box");
-    // Usiamo Jinja per passare l'ID, ma gestiamo il caso in cui sia nullo
-    const destId = "{{ dest_id if dest_id else '' }}";
-
     function scrollBottom() {
         if (chatBox) { chatBox.scrollTop = chatBox.scrollHeight; }
     }
-
-    function fetchMessages() {
-        // Se non abbiamo un destinatario selezionato, non fare la chiamata AJAX
-        if (!destId || destId === "") return;
-
-        fetch(`/api/get_messages/${destId}`)
-            .then(response => response.text())
-            .then(html => {
-                const isAtBottom = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 50;
-                chatBox.innerHTML = html;
-                if (isAtBottom) scrollBottom();
-            });
-    }
-
-    if (destId) {
-        setInterval(fetchMessages, 3000);
-        scrollBottom();
-    }
+    window.onload = scrollBottom;
 </script>
 
 {% endblock %}

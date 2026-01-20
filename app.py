@@ -534,7 +534,7 @@ def messaggi():
     db.close()
 
     # Mostriamo la pagina senza messaggi e senza destinatario_id
-    return render_template("chat_privata.html", utenti=utenti, messaggi=[], destinatario=None, dest_id=None)
+    return render_template("messaggi.html", utenti=utenti)
 
 
 @app.route("/messaggi/<int:dest_id>", methods=["GET", "POST"])
@@ -622,8 +622,8 @@ def broadcast():
         db.close()
         flash(f"Messaggio inviato a {len(destinatari)} utenti!")
     
-    return redirect(url_for('messaggi'))
-
+    # Ritorna alla pagina precedente (o a 'messaggi' se non disponibile)
+    return redirect(request.referrer or url_for('messaggi'))
 
 @app.route("/api/get_messages/<int:dest_id>")
 @login_required

@@ -2,9 +2,9 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-bold text-yellow-400 mb-6">Dashboard</h1>
+<h1 class="text-3xl font-bold text-yellow-400 mb-4 mt-1">Dashboard</h1>
 
-<section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 mt-4">
+<section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 mt-2">
 
   <div
     class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-indigo-500">
@@ -97,15 +97,22 @@
   </ul>
 </template>
 
-<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-  <div class="bg-white rounded-xl shadow p-4 h-[400px]">
-    <h3 class="font-semibold text-gray-700 mb-4 border-b pb-2">Prodotti per Categoria</h3>
-    <canvas id="prodottiChart"></canvas>
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6 pb-20 md:pb-10">
+
+  <div class="bg-white rounded-xl shadow p-4 flex flex-col h-[300px] md:h-[400px]">
+    <h3 class="font-semibold text-gray-700 mb-2 border-b pb-2 text-sm md:text-base">Prodotti per Categoria</h3>
+    <div class="flex-1 min-h-0">
+      <canvas id="prodottiChart"></canvas>
+    </div>
   </div>
-  <div class="bg-white rounded-xl shadow p-4 h-[400px]">
-    <h3 class="font-semibold text-gray-700 mb-4 border-b pb-2">Movimenti Ultimi 7 Giorni</h3>
-    <canvas id="movimentiChart"></canvas>
+
+  <div class="bg-white rounded-xl shadow p-4 flex flex-col h-[300px] md:h-[400px]">
+    <h3 class="font-semibold text-gray-700 mb-2 border-b pb-2 text-sm md:text-base">Movimenti Ultimi 7 Giorni</h3>
+    <div class="flex-1 min-h-0">
+      <canvas id="movimentiChart"></canvas>
+    </div>
   </div>
+
 </section>
 
 <script id="dashboard-data" type="application/json">
@@ -219,6 +226,7 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
+          display: window.innerWidth > 640,
           legend: { position: 'bottom' }
         }
       }
