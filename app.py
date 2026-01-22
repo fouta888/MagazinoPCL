@@ -8,6 +8,7 @@ import qrcode
 import io
 import base64
 from flask import Flask, render_template
+from io import BytesIO
 
 from flask import send_file
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
@@ -1470,8 +1471,9 @@ def prodotti_pdf():
 @app.route("/movimenti/pdf")
 @login_required
 def esporta_pdf():
+    # 1. Controllo Sicurezza
     if session.get("ruolo") != "Amministratore":
-        return "Accesso negato.", 403
+        return "Accesso negato: solo gli amministratori possono scaricare i report.", 403
 
     tipo_filtro = request.args.get('tipo', 'tutti')
     anno_filtro = request.args.get('anno')
@@ -1487,10 +1489,10 @@ def esporta_pdf():
         """, (session.get("username"), tipo_filtro, anno_filtro))
         conn.commit()
     except Exception as e:
-        print(f"Errore log: {e}")
+        print(f"Errore registrazione log: {e}")
         conn.rollback()
 
-    # --- QUERY (Indici: 0:data, 1:nome, 2:tipo, 3:qta, 4:codice_lotto, 5:scadenza) ---
+    # --- QUERY ---
     query = """
         SELECT m.data_movimento, p.nome, m.tipo_movimento, m.quantita, 
                l.codice_lotto, l.data_scadenza
@@ -1509,14 +1511,9 @@ def esporta_pdf():
     
     query += " ORDER BY m.data_movimento DESC"
     
-    try:
-        cur.execute(query, params)
-        movimenti = cur.fetchall()
-    except Exception as e:
-        print(f"Errore Query PDF: {e}")
-        movimenti = []
-    finally:
-        conn.close()
+    cur.execute(query, params)
+    movimenti = cur.fetchall()
+    conn.close()
 
     # --- GENERAZIONE PDF ---
     pdf = FPDF()
@@ -1524,7 +1521,9 @@ def esporta_pdf():
     pdf.set_font("Helvetica", "B", 14)
     
     titolo = f"Report Movimenti - {tipo_filtro.upper()}"
-    if anno_filtro and anno_filtro != 'None': titolo += f" ({anno_filtro})"
+    if anno_filtro and anno_filtro != 'None': 
+        titolo += f" ({anno_filtro})"
+    
     pdf.cell(190, 10, titolo, ln=True, align="C")
     pdf.ln(5)
 
@@ -1541,18 +1540,20 @@ def esporta_pdf():
     # Dati
     pdf.set_font("Helvetica", "", 7)
     for m in movimenti:
-        # Formattazione sicura delle date
-        d_mov = m[0].strftime('%d/%m/%Y %H:%M') if (len(m) > 0 and m[0]) else "-"
+        d_mov = m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-"
         p_nom = str(m[1] or "-")[:30].encode('latin-1', 'replace').decode('latin-1')
         t_mov = str(m[2] or "-").upper()
         q_mov = str(m[3] or "0")
         l_cod = str(m[4] or "-")[:20].encode('latin-1', 'replace').decode('latin-1')
-        l_sca = m[5].strftime('%d/%m/%Y') if (len(m) > 5 and m[5]) else "-"
+        l_sca = m[5].strftime('%d/%m/%Y') if m[5] else "-"
 
         # Colore riga: Rosso per uscita, Verde per entrata
-        if t_mov == 'USCITA': pdf.set_text_color(200, 0, 0)
-        elif t_mov == 'ENTRATA': pdf.set_text_color(0, 150, 0)
-        else: pdf.set_text_color(0, 0, 0)
+        if t_mov == 'USCITA': 
+            pdf.set_text_color(200, 0, 0)
+        elif t_mov == 'ENTRATA': 
+            pdf.set_text_color(0, 120, 0)
+        else: 
+            pdf.set_text_color(0, 0, 0)
 
         pdf.cell(28, 7, d_mov, 1)
         pdf.cell(50, 7, p_nom, 1)
@@ -1560,12 +1561,17 @@ def esporta_pdf():
         pdf.cell(15, 7, t_mov, 1, 0, "C")
         pdf.cell(12, 7, q_mov, 1, 0, "C")
         pdf.cell(55, 7, l_sca, 1, 1, "C")
-        pdf.set_text_color(0, 0, 0) # Reset colore
+        pdf.set_text_color(0, 0, 0)
 
-    response = make_response(pdf.output(dest='S').encode('latin-1'))
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=report_{tipo_filtro}.pdf'
-    return response
+    # --- INVIO FILE BINARIO ---
+    pdf_output = pdf.output(dest='S').encode('latin-1')
+    return send_file(
+        BytesIO(pdf_output),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f"report_{tipo_filtro}.pdf"
+    )
+
 
 @app.route("/admin/log_download")
 @login_required
