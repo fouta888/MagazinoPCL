@@ -1480,18 +1480,19 @@ def esporta_pdf():
     conn = get_db()
     cur = conn.cursor()
 
-    # --- LOG DOWNLOAD ---
+    # --- LOG DOWNLOAD (Corretto per corrispondere alla tabella DB) ---
     try:
         cur.execute("""
-            INSERT INTO log_download (utente_id, username, tipo_report, anno_filtro)
-            VALUES (%s, %s, %s, %s)
-        """, (session.get("user_id"), session.get("username"), tipo_filtro, anno_filtro))
+            INSERT INTO log_download (username, tipo_report, anno_filtro, data_download)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+        """, (session.get("username"), tipo_filtro, anno_filtro))
         conn.commit()
     except Exception as e:
-        print(f"Errore registrazione log: {e}")
-    # --------------------
+        print(f"Errore registrazione log (non bloccante): {e}")
+        conn.rollback() # Annulla la transazione del log se fallisce
+    # -----------------------------------------------------------------
 
-    # Query per i movimenti (stessa di prima)
+    # Query per i movimenti
     query = """
         SELECT m.data_movimento, p.nome, m.tipo_movimento, m.quantita, l.data_scadenza
         FROM movimenti m
@@ -1503,11 +1504,12 @@ def esporta_pdf():
     if tipo_filtro != 'tutti':
         query += " AND m.tipo_movimento = %s"
         params.append(tipo_filtro)
-    if anno_filtro:
+    if anno_filtro and anno_filtro != 'None':
         query += " AND EXTRACT(YEAR FROM m.data_movimento) = %s"
         params.append(int(anno_filtro))
     
     query += " ORDER BY m.data_movimento DESC"
+    
     cur.execute(query, params)
     movimenti = cur.fetchall()
     conn.close()
@@ -1518,12 +1520,13 @@ def esporta_pdf():
     pdf.set_font("Helvetica", "B", 16)
     
     titolo = f"Report Movimenti PCL - {tipo_filtro.capitalize()}"
-    if anno_filtro: titolo += f" Anno {anno_filtro}"
+    if anno_filtro and anno_filtro != 'None': 
+        titolo += f" Anno {anno_filtro}"
     
     pdf.cell(190, 10, titolo, ln=True, align="C")
     pdf.ln(10)
 
-    # Intestazione e Dati (come visti prima...)
+    # Intestazione Tabella
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(35, 10, "Data", 1, 0, "C", True)
@@ -1532,22 +1535,27 @@ def esporta_pdf():
     pdf.cell(20, 10, "Qta", 1, 0, "C", True)
     pdf.cell(45, 10, "Scadenza Lotto", 1, 1, "C", True)
 
+    # Dati Tabella
     pdf.set_font("Helvetica", "", 9)
     for m in movimenti:
         data_str = m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-"
         scadenza_str = m[4].strftime('%d/%m/%Y') if m[4] else "-"
+        
         pdf.cell(35, 8, data_str, 1)
-        pdf.cell(65, 8, str(m[1])[:30].encode('latin-1', 'replace').decode('latin-1'), 1)
+        # Pulizia testo per caratteri non standard
+        nome_prodotto = str(m[1])[:30].encode('latin-1', 'replace').decode('latin-1')
+        pdf.cell(65, 8, nome_prodotto, 1)
         pdf.cell(25, 8, str(m[2]).upper(), 1, 0, "C")
         pdf.cell(20, 8, str(m[3]), 1, 0, "C")
         pdf.cell(45, 8, scadenza_str, 1, 1, "C")
 
+    # Preparazione risposta PDF
     response = make_response(pdf.output(dest='S').encode('latin-1'))
     response.headers['Content-Type'] = 'application/pdf'
-    filename = f"movimenti_{tipo_filtro}_{anno_filtro if anno_filtro else 'storico'}.pdf"
-    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+    nome_file = f"movimenti_{tipo_filtro}_{anno_filtro if anno_filtro else 'storico'}.pdf"
+    response.headers['Content-Disposition'] = f'attachment; filename={nome_file}'
+    
     return response
-
 
 @app.route("/admin/log_download")
 @login_required
