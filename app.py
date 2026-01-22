@@ -1558,6 +1558,7 @@ def visualizza_log():
     cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC")
     logs = cur.fetchall()
     conn.close()
+    print(f"DEBUG LOGS: {logs}")
     return render_template("admin_logs.html", logs=logs)
 
 

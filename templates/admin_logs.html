@@ -40,7 +40,8 @@
                             {% if log[1] == 'entrata' %} bg-green-100 text-green-700 
                             {% elif log[1] == 'uscita' %} bg-red-100 text-red-700 
                             {% else %} bg-blue-100 text-blue-700 {% endif %}">
-                            {{ log[1].upper() }}
+                            {# Usiamo |upper come filtro Jinja così se è None non crasha #}
+                            {{ (log[1] or 'Sconosciuto')|upper }}
                         </span>
                     </td>
                     <td class="px-6 py-4">
