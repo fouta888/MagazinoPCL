@@ -1553,14 +1553,22 @@ def esporta_pdf():
 @login_required
 @ruolo_required("Amministratore")
 def visualizza_log():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC")
-    logs = cur.fetchall()
-    conn.close()
-    print(f"DEBUG LOGS: {logs}")
-    return render_template("admin_logs.html", logs=logs)
-
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC")
+        logs = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        # Debug nel terminale per sicurezza
+        print(f"DEBUG LOGS CARICATI: {len(logs)} record trovati")
+        
+        return render_template("admin_logs.html", logs=logs)
+    except Exception as e:
+        print(f"ERRORE CRITICO LOG DOWNLOAD: {e}")
+        return f"Errore durante il caricamento dei log: {str(e)}", 500
+    
 
 @app.context_processor
 def inject_globals():

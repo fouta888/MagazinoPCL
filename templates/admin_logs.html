@@ -30,18 +30,21 @@
                 {% for log in logs %}
                 <tr class="hover:bg-blue-50 transition-colors">
                     <td class="px-6 py-4 font-mono text-gray-600">
+                        {% if log[3] %}
                         {{ log[3].strftime('%d/%m/%Y %H:%M:%S') }}
+                        {% else %}
+                        Data N/D
+                        {% endif %}
                     </td>
                     <td class="px-6 py-4 font-bold text-blue-700">
-                        {{ log[0] }}
+                        {{ log[0] or 'Sistema' }}
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 rounded-md text-xs font-bold 
                             {% if log[1] == 'entrata' %} bg-green-100 text-green-700 
                             {% elif log[1] == 'uscita' %} bg-red-100 text-red-700 
                             {% else %} bg-blue-100 text-blue-700 {% endif %}">
-                            {# Usiamo |upper come filtro Jinja così se è None non crasha #}
-                            {{ (log[1] or 'Sconosciuto')|upper }}
+                            {{ (log[1] or 'TUTTI')|upper }}
                         </span>
                     </td>
                     <td class="px-6 py-4">
@@ -49,6 +52,7 @@
                     </td>
                 </tr>
                 {% else %}
+                {# Questo blocco viene mostrato solo se la lista 'logs' è vuota #}
                 <tr>
                     <td colspan="4" class="px-6 py-10 text-center text-gray-400 italic">
                         Nessun download registrato finora.
