@@ -22,9 +22,29 @@
 
             <div
                 class="absolute hidden group-hover:block bg-white border shadow-2xl rounded-xl mt-1 z-50 min-w-[220px] right-0 lg:left-0">
-                <div class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b">Filtri Rapidi</div>
-                <a href="{{ url_for('esporta_pdf', tipo='tutti') }}" class="block px-4 py-2 hover:bg-blue-50">Tutti i
-                    movimenti</a>
+                <div class="p-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b italic">Filtri Rapidi
+                    PDF</div>
+
+                <a href="{{ url_for('esporta_pdf', tipo='tutti', anno=request.args.get('anno')) }}"
+                    class="block px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 border-b flex items-center gap-2">
+                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span> Tutti i movimenti
+                </a>
+
+                <a href="{{ url_for('esporta_pdf', tipo='entrata', anno=request.args.get('anno')) }}"
+                    class="block px-4 py-3 text-sm text-gray-700 hover:bg-green-50 border-b flex items-center gap-2">
+                    <span class="w-2 h-2 bg-green-500 rounded-full"></span> Solo Carichi (Entrate)
+                </a>
+
+                <a href="{{ url_for('esporta_pdf', tipo='uscita', anno=request.args.get('anno')) }}"
+                    class="block px-4 py-3 text-sm text-gray-700 hover:bg-red-50 flex items-center gap-2">
+                    <span class="w-2 h-2 bg-red-500 rounded-full"></span> Solo Scarichi (Uscite)
+                </a>
+
+                {% if request.args.get('anno') %}
+                <div class="p-2 bg-yellow-50 text-[10px] text-yellow-700 border-t rounded-b-xl">
+                    ⚠️ Filtro anno <strong>{{ request.args.get('anno') }}</strong> applicato
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}

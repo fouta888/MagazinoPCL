@@ -1472,7 +1472,7 @@ def prodotti_pdf():
 def esporta_pdf():
     # 1. Controllo Sicurezza
     if session.get("ruolo") != "Amministratore":
-        return "Accesso negato: solo gli amministratori possono scaricare i report.", 403
+        return "Accesso negato.", 403
 
     tipo_filtro = request.args.get('tipo', 'tutti')
     anno_filtro = request.args.get('anno')
@@ -1480,7 +1480,7 @@ def esporta_pdf():
     conn = get_db()
     cur = conn.cursor()
 
-    # --- LOG DOWNLOAD (Corretto per corrispondere alla tabella DB) ---
+    # --- LOG DOWNLOAD ---
     try:
         cur.execute("""
             INSERT INTO log_download (username, tipo_report, anno_filtro, data_download)
@@ -1488,13 +1488,13 @@ def esporta_pdf():
         """, (session.get("username"), tipo_filtro, anno_filtro))
         conn.commit()
     except Exception as e:
-        print(f"Errore registrazione log (non bloccante): {e}")
-        conn.rollback() # Annulla la transazione del log se fallisce
-    # -----------------------------------------------------------------
+        print(f"Errore log: {e}")
+        conn.rollback()
 
-    # Query per i movimenti
+    # --- QUERY POTENZIATA PER LOTTI ---
     query = """
-        SELECT m.data_movimento, p.nome, m.tipo_movimento, m.quantita, l.data_scadenza
+        SELECT m.data_movimento, p.nome, m.tipo_movimento, m.quantita, 
+               l.codice_lotto, l.data_scadenza
         FROM movimenti m
         JOIN prodotti p ON m.prodotto_id = p.id
         LEFT JOIN lotti l ON m.lotto_id = l.id
@@ -1509,54 +1509,54 @@ def esporta_pdf():
         params.append(int(anno_filtro))
     
     query += " ORDER BY m.data_movimento DESC"
-    
     cur.execute(query, params)
     movimenti = cur.fetchall()
     conn.close()
 
-    # Generazione PDF (FPDF)
+    # --- GENERAZIONE PDF ---
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     
-    titolo = f"Report Movimenti PCL - {tipo_filtro.capitalize()}"
-    if anno_filtro and anno_filtro != 'None': 
-        titolo += f" Anno {anno_filtro}"
+    titolo = f"Report Lotti e Movimenti - {tipo_filtro.capitalize()}"
+    if anno_filtro and anno_filtro != 'None': titolo += f" ({anno_filtro})"
     
     pdf.cell(190, 10, titolo, ln=True, align="C")
     pdf.ln(10)
 
-    # Intestazione Tabella
-    pdf.set_font("Helvetica", "B", 10)
+    # Intestazione Tabella (Aggiunto Lotto e Scadenza)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(230, 230, 230)
-    pdf.cell(35, 10, "Data", 1, 0, "C", True)
-    pdf.cell(65, 10, "Prodotto", 1, 0, "C", True)
-    pdf.cell(25, 10, "Tipo", 1, 0, "C", True)
-    pdf.cell(20, 10, "Qta", 1, 0, "C", True)
-    pdf.cell(45, 10, "Scadenza Lotto", 1, 1, "C", True)
+    pdf.cell(30, 10, "Data", 1, 0, "C", True)
+    pdf.cell(50, 10, "Prodotto", 1, 0, "C", True)
+    pdf.cell(30, 10, "Lotto", 1, 0, "C", True) # <-- Nuova
+    pdf.cell(20, 10, "Tipo", 1, 0, "C", True)
+    pdf.cell(15, 10, "Qta", 1, 0, "C", True)
+    pdf.cell(45, 10, "Scadenza", 1, 1, "C", True) # <-- Nuova
 
     # Dati Tabella
-    pdf.set_font("Helvetica", "", 9)
+    pdf.set_font("Helvetica", "", 8)
     for m in movimenti:
-        data_str = m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-"
-        scadenza_str = m[4].strftime('%d/%m/%Y') if m[4] else "-"
-        
-        pdf.cell(35, 8, data_str, 1)
-        # Pulizia testo per caratteri non standard
-        nome_prodotto = str(m[1])[:30].encode('latin-1', 'replace').decode('latin-1')
-        pdf.cell(65, 8, nome_prodotto, 1)
-        pdf.cell(25, 8, str(m[2]).upper(), 1, 0, "C")
-        pdf.cell(20, 8, str(m[3]), 1, 0, "C")
-        pdf.cell(45, 8, scadenza_str, 1, 1, "C")
+        data_mov = m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-"
+        nome_prod = str(m[1])[:25].encode('latin-1', 'replace').decode('latin-1')
+        lotto_cod = str(m[4] if m[4] else "-")[:15]
+        tipo_mov = str(m[2]).upper()
+        qta = str(m[3])
+        scadenza = m[5].strftime('%d/%m/%Y') if m[5] else "-"
 
-    # Preparazione risposta PDF
+        pdf.cell(30, 8, data_mov, 1)
+        pdf.cell(50, 8, nome_prod, 1)
+        pdf.cell(30, 8, lotto_cod, 1)
+        pdf.cell(20, 8, tipo_mov, 1, 0, "C")
+        pdf.cell(15, 8, qta, 1, 0, "C")
+        pdf.cell(45, 8, scadenza, 1, 1, "C")
+
+    # Risposta PDF
     response = make_response(pdf.output(dest='S').encode('latin-1'))
     response.headers['Content-Type'] = 'application/pdf'
-    nome_file = f"movimenti_{tipo_filtro}_{anno_filtro if anno_filtro else 'storico'}.pdf"
-    response.headers['Content-Disposition'] = f'attachment; filename={nome_file}'
-    
+    filename = f"report_lotti_{tipo_filtro}.pdf"
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
     return response
-
 @app.route("/admin/log_download")
 @login_required
 @ruolo_required("Amministratore")
