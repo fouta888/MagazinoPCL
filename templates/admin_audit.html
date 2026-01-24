@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-green-400">Registro Operazioni Magazzino</h1>
+    <div class="flex gap-2">
+        <a href="{{ url_for('esporta_audit_pdf') }}"
+            class="text-sm bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-2 shadow-md">
+            📄 Scarica PDF Log
+        </a>
+        <a href="{{ url_for('visualizza_log_report') }}"
+            class="text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-500 transition">
+            📄 Log Report PDF
+        </a>
+        <a href="{{ url_for('dashboard') }}"
+            class="text-sm bg-gray-700 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition">
+            ← Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-gray-200">
+    <div class="p-4 bg-gray-50 border-b border-gray-200">
+        <p class="text-sm text-gray-500 font-medium italic">
+            Nota: In questo registro vedi chi ha effettuato carichi e scarichi fisici e il relativo codice lotto.
+        </p>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-800 text-gray-100 uppercase text-xs">
+                <tr>
+                    <th class="px-6 py-4">Data e Ora</th>
+                    <th class="px-6 py-4">Operatore</th>
+                    <th class="px-6 py-4">Azione</th>
+                    <th class="px-6 py-4">Dettaglio Operazione</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 text-gray-800">
+                {% for log in logs_operazioni %}
+                <tr class="hover:bg-green-50 transition-colors">
+                    <td class="px-6 py-4 font-mono text-gray-600">
+                        {{ log[3].strftime('%d/%m/%Y %H:%M:%S') if log[3] else 'N/D' }}
+                    </td>
+                    <td class="px-6 py-4 font-bold text-blue-700">
+                        {{ log[0] }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded-md text-xs font-bold 
+                            {% if log[1] == 'CARICO' %} bg-green-100 text-green-700 
+                            {% elif log[1] == 'SCARICO' %} bg-red-100 text-red-700 
+                            {% else %} bg-yellow-100 text-yellow-700 {% endif %}">
+                            {{ log[1] }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-gray-700 font-medium">
+                        {{ log[2] }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="px-6 py-10 text-center text-gray-400 italic">
+                        Nessuna operazione registrata.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 from config import *
-from functools import wraps  # import necessario per login_required e ruolo_required
+from functools import wraps # import necessario per login_required e ruolo_required
 import socket
 import qrcode
 import io
@@ -24,6 +24,7 @@ from collections import defaultdict
 
 from fpdf import FPDF
 from flask import make_response
+import datetime
 
 
 def is_admin():
@@ -263,68 +264,65 @@ def carico_lotto():
         prodotto_id = int(request.form["prodotto_id"])
         quantita = int(request.form["quantita"])
         data_scadenza = request.form.get("data_scadenza")
+        
+        # 1. GESTIONE CODICE LOTTO (Prima della ricerca nel DB)
+        codice_lotto = request.form.get("codice_lotto", "").strip()
+        if not codice_lotto:
+            # Genera codice automatico: L-20260124-1530
+            from datetime import datetime
+            codice_lotto = datetime.now().strftime("L-%Y%m%d-%H%M")
 
-        # ✅ FIX DATE VUOTA
-        if not data_scadenza:
+        if not data_scadenza: 
             data_scadenza = None
 
-        # 1️⃣ Controlla se esiste già un lotto con stessa scadenza
+        # Recupero nome prodotto per il log
+        cur.execute("SELECT nome FROM prodotti WHERE id = %s", (prodotto_id,))
+        nome_prodotto = cur.fetchone()[0]
+
+        # 2. CONTROLLO ESISTENZA (Ora con il codice_lotto già definito)
         cur.execute("""
-            SELECT id
-            FROM lotti
-            WHERE prodotto_id = %s AND data_scadenza IS NOT DISTINCT FROM %s
-        """, (prodotto_id, data_scadenza))
+            SELECT id FROM lotti 
+            WHERE prodotto_id = %s 
+              AND data_scadenza IS NOT DISTINCT FROM %s 
+              AND codice_lotto IS NOT DISTINCT FROM %s
+        """, (prodotto_id, data_scadenza, codice_lotto))
         lotto = cur.fetchone()
 
         if lotto:
-            # Aggiorna quantità lotto esistente
-            cur.execute("""
-                UPDATE lotti
-                SET quantita = quantita + %s
-                WHERE id = %s
-            """, (quantita, lotto[0]))
+            # Aggiorna esistente
+            cur.execute("UPDATE lotti SET quantita = quantita + %s WHERE id = %s", (quantita, lotto[0]))
             lotto_id = lotto[0]
         else:
-            # Crea nuovo lotto
+            # Crea nuovo
             cur.execute("""
-                INSERT INTO lotti (prodotto_id, quantita, data_scadenza)
-                VALUES (%s, %s, %s)
-                RETURNING id
-            """, (prodotto_id, quantita, data_scadenza))
+                INSERT INTO lotti (prodotto_id, quantita, data_scadenza, codice_lotto)
+                VALUES (%s, %s, %s, %s) RETURNING id
+            """, (prodotto_id, quantita, data_scadenza, codice_lotto))
             lotto_id = cur.fetchone()[0]
 
-        # 2️⃣ Aggiorna quantità totale prodotto
+        # 3. AGGIORNA TOTALI E REGISTRA MOVIMENTO
+        cur.execute("UPDATE prodotti SET quantita = quantita + %s WHERE id = %s", (quantita, prodotto_id))
+        
         cur.execute("""
-            UPDATE prodotti
-            SET quantita = quantita + %s
-            WHERE id = %s
-        """, (quantita, prodotto_id))
-
-        # 3️⃣ Registra movimento
-        cur.execute("""
-            INSERT INTO movimenti (
-                prodotto_id,
-                lotto_id,
-                tipo_movimento,
-                quantita,
-                data_scadenza
-            )
+            INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, data_scadenza)
             VALUES (%s, %s, 'entrata', %s, %s)
         """, (prodotto_id, lotto_id, quantita, data_scadenza))
 
+        # 4. LOG OPERAZIONE (Chi ha fatto cosa)
+        cur.execute("""
+            INSERT INTO log_operazioni (username, azione, dettaglio)
+            VALUES (%s, %s, %s)
+        """, (session.get('username'), 'CARICO', f"Caricati {quantita} pz di {nome_prodotto} (Lotto: {codice_lotto})"))
+
         conn.commit()
         conn.close()
-
-        flash("✅ Carico lotto effettuato correttamente", "success")
+        flash(f"✅ Carico effettuato correttamente (Lotto: {codice_lotto})", "success")
         return redirect(url_for("lotti_view"))
 
-    # GET → prodotti per select
     cur.execute("SELECT id, nome FROM prodotti ORDER BY nome")
     prodotti = cur.fetchall()
     conn.close()
-
     return render_template("carico_lotto.html", prodotti=prodotti)
-
 
 @app.route("/lotti/uscita", methods=["GET", "POST"])
 @login_required
@@ -337,63 +335,53 @@ def uscita_lotto():
         prodotto_id = int(request.form["prodotto_id"])
         quantita_da_scaricare = int(request.form["quantita"])
 
-        # 🔒 Controllo quantità totale prodotto (Backend)
-        cur.execute("SELECT quantita FROM prodotti WHERE id = %s", (prodotto_id,))
-        qta_totale = cur.fetchone()[0]
+        cur.execute("SELECT nome, quantita FROM prodotti WHERE id = %s", (prodotto_id,))
+        prod_data = cur.fetchone()
+        nome_prodotto = prod_data[0]
+        qta_totale = prod_data[1]
 
         if qta_totale < quantita_da_scaricare:
             conn.close()
-            flash("❌ Quantità insufficiente a magazzino", "error")
+            flash("❌ Quantità insufficiente", "error")
             return redirect(url_for("uscita_lotto"))
 
-        oggi = date.today()
-
-        # 🔒 SOLO lotti NON scaduti (Logica FIFO)
         cur.execute("""
-            SELECT id, quantita, data_scadenza
-            FROM lotti
-            WHERE prodotto_id = %s
-              AND quantita > 0
-              AND (data_scadenza IS NULL OR data_scadenza >= %s)
+            SELECT id, quantita, data_scadenza, codice_lotto FROM lotti
+            WHERE prodotto_id = %s AND quantita > 0
+            AND (data_scadenza IS NULL OR data_scadenza >= CURRENT_DATE)
             ORDER BY data_scadenza ASC NULLS LAST
-        """, (prodotto_id, oggi))
-
+        """, (prodotto_id,))
+        
         lotti = cur.fetchall()
         restante = quantita_da_scaricare
 
-        for lotto_id, qta_lotto, data_scadenza in lotti:
+        for lotto_id, qta_lotto, data_sca, cod_lotto in lotti:
             if restante <= 0: break
+            mov_qta = qta_lotto if qta_lotto <= restante else restante
             
-            if qta_lotto <= restante:
-                cur.execute("UPDATE lotti SET quantita = 0 WHERE id = %s", (lotto_id,))
-                movimento_qta = qta_lotto
-                restante -= qta_lotto
-            else:
-                cur.execute("UPDATE lotti SET quantita = quantita - %s WHERE id = %s", (restante, lotto_id))
-                movimento_qta = restante
-                restante = 0
-
-            cur.execute("""
-                INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita)
-                VALUES (%s, %s, 'uscita', %s)
-            """, (prodotto_id, lotto_id, movimento_qta))
+            cur.execute("UPDATE lotti SET quantita = quantita - %s WHERE id = %s", (mov_qta, lotto_id))
+            cur.execute("INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita) VALUES (%s, %s, 'uscita', %s)",
+                       (prodotto_id, lotto_id, mov_qta))
+            restante -= mov_qta
 
         if restante > 0:
             conn.rollback()
-            conn.close()
-            flash("❌ Quantità insufficiente nei lotti validi (scadenza futura)", "error")
-            return redirect(url_for("uscita_lotto"))
+            flash("❌ Errore: lotti validi insufficienti", "error")
+        else:
+            cur.execute("UPDATE prodotti SET quantita = quantita - %s WHERE id = %s", (quantita_da_scaricare, prodotto_id))
+            # LOG OPERAZIONE (Tracciabilità)
+            cur.execute("""
+                INSERT INTO log_operazioni (username, azione, dettaglio)
+                VALUES (%s, %s, %s)
+            """, (session.get('username'), 'SCARICO', f"Scaricati {quantita_da_scaricare} pz di {nome_prodotto}"))
+            conn.commit()
+            flash("✅ Scarico effettuato", "success")
 
-        # 📉 Aggiorna quantità prodotto totale
-        cur.execute("UPDATE prodotti SET quantita = quantita - %s WHERE id = %s", (quantita_da_scaricare, prodotto_id))
         cur.execute("DELETE FROM lotti WHERE quantita = 0")
-
         conn.commit()
         conn.close()
-        flash("✅ Scarico effettuato correttamente", "success")
         return redirect(url_for("lotti_view"))
 
-    # --- MODIFICA GET QUI ---
     cur.execute("SELECT id, nome, quantita FROM prodotti WHERE quantita > 0 ORDER BY nome")
     prodotti = cur.fetchall()
     conn.close()
@@ -1518,58 +1506,140 @@ def esporta_pdf():
     # --- GENERAZIONE PDF ---
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_font("Arial", "B", 14)
     
-    titolo = f"Report Movimenti - {tipo_filtro.upper()}"
-    if anno_filtro and anno_filtro != 'None': 
-        titolo += f" ({anno_filtro})"
+    testo_titolo = f"REPORT MOVIMENTI - {tipo_filtro.upper()}"
+    if anno_filtro and anno_filtro != 'None':
+        testo_titolo += f" ANNO {anno_filtro}"
     
-    pdf.cell(190, 10, titolo, ln=True, align="C")
+    pdf.cell(190, 10, testo_titolo, ln=True, align="C")
     pdf.ln(5)
 
-    # Intestazione
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(28, 8, "Data", 1, 0, "C", True)
+    # Intestazione Tabella
+    pdf.set_font("Arial", "B", 8)
+    pdf.set_fill_color(230, 230, 230)
+    pdf.cell(30, 8, "Data", 1, 0, "C", True)
     pdf.cell(50, 8, "Prodotto", 1, 0, "C", True)
     pdf.cell(30, 8, "Lotto", 1, 0, "C", True)
     pdf.cell(15, 8, "Tipo", 1, 0, "C", True)
-    pdf.cell(12, 8, "Qta", 1, 0, "C", True)
-    pdf.cell(55, 8, "Scadenza Lotto", 1, 1, "C", True)
+    pdf.cell(15, 8, "Qta", 1, 0, "C", True)
+    pdf.cell(50, 8, "Scadenza", 1, 1, "C", True)
 
-    # Dati
-    pdf.set_font("Helvetica", "", 7)
+    # Dati Tabella
+    pdf.set_font("Arial", "", 8)
     for m in movimenti:
-        d_mov = m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-"
-        p_nom = str(m[1] or "-")[:30].encode('latin-1', 'replace').decode('latin-1')
-        t_mov = str(m[2] or "-").upper()
-        q_mov = str(m[3] or "0")
-        l_cod = str(m[4] or "-")[:20].encode('latin-1', 'replace').decode('latin-1')
-        l_sca = m[5].strftime('%d/%m/%Y') if m[5] else "-"
+        # Colore riga basato sul tipo
+        tipo_testo = str(m[2] or "").upper()
+        if tipo_testo == 'USCITA':
+            pdf.set_text_color(200, 0, 0) # Rosso
+        elif tipo_testo == 'ENTRATA':
+            pdf.set_text_color(0, 120, 0) # Verde
+        else:
+            pdf.set_text_color(0, 0, 0) # Nero
 
-        # Colore riga: Rosso per uscita, Verde per entrata
-        if t_mov == 'USCITA': 
-            pdf.set_text_color(200, 0, 0)
-        elif t_mov == 'ENTRATA': 
-            pdf.set_text_color(0, 120, 0)
-        else: 
-            pdf.set_text_color(0, 0, 0)
+        pdf.cell(30, 7, m[0].strftime('%d/%m/%Y %H:%M') if m[0] else "-", 1)
+        pdf.cell(50, 7, str(m[1] or "-")[:25].encode('latin-1', 'replace').decode('latin-1'), 1)
+        pdf.cell(30, 7, str(m[4] or "-")[:15].encode('latin-1', 'replace').decode('latin-1'), 1)
+        pdf.cell(15, 7, tipo_testo, 1, 0, "C")
+        pdf.cell(15, 7, str(m[3] or "0"), 1, 0, "C")
+        pdf.cell(50, 7, m[5].strftime('%d/%m/%Y') if m[5] else "-", 1, 1)
+        
+        pdf.set_text_color(0, 0, 0) # Reset colore per riga successiva
 
-        pdf.cell(28, 7, d_mov, 1)
-        pdf.cell(50, 7, p_nom, 1)
-        pdf.cell(30, 7, l_cod, 1)
-        pdf.cell(15, 7, t_mov, 1, 0, "C")
-        pdf.cell(12, 7, q_mov, 1, 0, "C")
-        pdf.cell(55, 7, l_sca, 1, 1, "C")
-        pdf.set_text_color(0, 0, 0)
+    # --- OUTPUT FINALE ---
+    # Usiamo BytesIO per gestire il PDF in memoria
+    pdf_stream = BytesIO()
+    pdf_out = pdf.output(dest='S').encode('latin-1')
+    pdf_stream.write(pdf_out)
+    pdf_stream.seek(0)
 
-    # --- INVIO FILE BINARIO ---
-    pdf_output = pdf.output(dest='S').encode('latin-1')
     return send_file(
-        BytesIO(pdf_output),
+        pdf_stream,
         mimetype='application/pdf',
         as_attachment=True,
         download_name=f"report_{tipo_filtro}.pdf"
+    )
+
+
+@app.route("/admin/esporta-audit-movimenti")
+@login_required
+@ruolo_required("Amministratore")
+def esporta_pdf_audit():
+    from fpdf import FPDF
+    from io import BytesIO
+
+    # 1. Recupero dati dal DB
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT data_operazione, username, azione, dettaglio FROM log_operazioni ORDER BY data_operazione DESC")
+    logs = cur.fetchall()
+    conn.close()
+
+    # 2. Classe PDF con Header automatico e Footer
+    class PDF_Audit(FPDF):
+        def header(self):
+            # Titolo Documento
+            self.set_font("Arial", "B", 15)
+            self.set_text_color(0, 0, 0)
+            self.cell(190, 10, "REGISTRO MOVIMENTI MERCE (AUDIT)", ln=True, align="C")
+            self.ln(5)
+            
+            # INTESTAZIONE TABELLA (Si ripete su ogni pagina)
+            self.set_font("Arial", "B", 10)
+            self.set_fill_color(50, 50, 50)  # Grigio scuro
+            self.set_text_color(255, 255, 255) # Testo bianco
+            
+            self.cell(35, 10, "DATA", 1, 0, "C", True)
+            self.cell(25, 10, "UTENTE", 1, 0, "C", True)
+            self.cell(25, 10, "AZIONE", 1, 0, "C", True)
+            self.cell(105, 10, "DETTAGLIO", 1, 1, "C", True)
+            
+            # Reset per i dati
+            self.set_text_color(0, 0, 0)
+            self.set_font("Arial", "", 9)
+
+        def footer(self):
+            self.set_y(-15)
+            self.set_font("Arial", "I", 8)
+            self.cell(0, 10, f'Pagina {self.page_no()}', 0, 0, 'C')
+
+    # 3. Inizializzazione PDF
+    pdf = PDF_Audit()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # 4. Ciclo dati con righe alternate
+    fill = False # Variabile per alternare il colore
+    for row in logs:
+        data_f = row[0].strftime('%d/%m/%Y %H:%M') if row[0] else "-"
+        utente = str(row[1])
+        azione = str(row[2])
+        dettaglio = str(row[3])
+        
+        # Pulizia testo
+        testo_d = dettaglio.encode('latin-1', 'replace').decode('latin-1')
+
+        # Imposta colore di sfondo per la riga alternata
+        if fill:
+            pdf.set_fill_color(240, 240, 240) # Grigio chiarissimo
+        else:
+            pdf.set_fill_color(255, 255, 255) # Bianco
+
+        # Scrittura riga (l'ultimo parametro 'True' attiva il colore di sfondo)
+        pdf.cell(35, 8, data_f, 1, 0, "C", True)
+        pdf.cell(25, 8, utente, 1, 0, "C", True)
+        pdf.cell(25, 8, azione, 1, 0, "C", True)
+        pdf.cell(105, 8, testo_d, 1, 1, "L", True)
+        
+        fill = not fill # Inverte il colore per la riga successiva
+
+    # 5. Ritorno del file
+    pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
+    return send_file(
+        BytesIO(pdf_out), 
+        mimetype='application/pdf', 
+        as_attachment=True, 
+        download_name="audit_movimenti_magazzino.pdf"
     )
 
 
@@ -1592,7 +1662,49 @@ def visualizza_log():
     except Exception as e:
         print(f"ERRORE CRITICO LOG DOWNLOAD: {e}")
         return f"Errore durante il caricamento dei log: {str(e)}", 500
+
+
+@app.route("/admin/audit-operazioni")
+@login_required
+@ruolo_required("Amministratore")
+def audit_operazioni():
+    conn = get_db()
+    cur = conn.cursor()
+    # Recuperiamo gli ultimi 200 movimenti registrati nella tabella log_operazioni
+    cur.execute("""
+        SELECT username, azione, dettaglio, data_operazione 
+        FROM log_operazioni 
+        ORDER BY data_operazione DESC 
+        LIMIT 200
+    """)
+    logs_op = cur.fetchall()
+    conn.close()
+    return render_template("admin_audit.html", logs=logs_op)
+
+
+@app.route("/admin/registri")
+@login_required
+@ruolo_required("Amministratore")
+def visualizza_tutti_i_log():
+    conn = get_db()
+    cur = conn.cursor()
     
+    # 1. Log dei Download PDF
+    cur.execute("""
+    SELECT username, tipo_report, anno_filtro, data_download 
+    FROM log_download 
+    ORDER BY data_download DESC 
+    LIMIT 50
+""")
+    logs_pdf = cur.fetchall()
+    
+    # 2. Log delle Operazioni (Carichi/Scarichi)
+    cur.execute("SELECT username, azione, dettaglio, data_operazione FROM log_operazioni ORDER BY data_operazione DESC LIMIT 50")
+    logs_op = cur.fetchall()
+    
+    conn.close()
+    return render_template("admin_full_logs.html", logs_pdf=logs_pdf, logs_op=logs_op)
+
 
 @app.context_processor
 def inject_globals():

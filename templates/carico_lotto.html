@@ -9,30 +9,31 @@
     <label class="block font-semibold">Prodotto</label>
     <select name="prodotto_id" required class="w-full border rounded p-2">
       {% for p in prodotti %}
-        <option value="{{ p[0] }}">{{ p[1] }}</option>
+      <option value="{{ p[0] }}">{{ p[1] }}</option>
       {% endfor %}
     </select>
 
     <label class="block font-semibold">Quantità</label>
-    <input type="number" name="quantita" min="1" required
-           class="w-full border rounded p-2">
+    <input type="number" name="quantita" min="1" required class="w-full border rounded p-2">
+
+    <label class="block font-semibold text-blue-700">Codice Lotto (ID Univoco)</label>
+    <input type="text" name="codice_lotto" placeholder="Es: ABC-123 o lotto-2026-A"
+      class="w-full border-2 border-blue-100 rounded p-2 focus:border-blue-500 outline-none">
 
     <label class="block font-semibold">Data scadenza</label>
-    <input type="date" name="data_scadenza"
-           class="w-full border rounded p-2">
+    <input type="date" name="data_scadenza" class="w-full border rounded p-2">
 
-    <button class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
+    <button
+      class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold shadow-md transition-colors">
       💾 Carica Lotto
     </button>
 
     <a href="{{ url_for('lotti_view') }}"
-            class="block text-center text-gray-700 mt-6 text-sm hover:text-gray-600 hover:underline">
-            ← Torna alla lista lotti
-        </a>
+      class="block text-center text-gray-700 mt-6 text-sm hover:text-gray-600 hover:underline">
+      ← Torna alla lista lotti
+    </a>
 
   </form>
 </div>
 
 {% endblock %}
-
-
