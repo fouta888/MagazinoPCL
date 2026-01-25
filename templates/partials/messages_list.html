@@ -1,12 +1,32 @@
-{% for m in messaggi %}
-    {% set is_me = (m[2] == session.get("username")) %}
-    <div class="flex {{ 'justify-end' if is_me else 'justify-start' }}">
-        <div class="max-w-[75%] rounded-2xl px-4 py-2 shadow-sm
-            {{ 'bg-green-600 text-white rounded-tr-none' if is_me else 'bg-white text-gray-800 border rounded-tl-none' }}">
-            <div class="text-[10px] mb-1 opacity-70 font-bold uppercase tracking-wider">
-                {{ m[2] }} • {{ m[1].strftime("%H:%M") }}
+<div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f0f2f5] flex flex-col">
+    {% for m in messaggi %}
+        {# Pulizia e confronto nomi #}
+        {% set mittente = m[2]|string|lower|trim %}
+        {% set io = session.get("username")|string|lower|trim %}
+        {% set is_me = (mittente == io) %}
+
+        <div class="flex w-full {{ 'justify-end' if is_me else 'justify-start' }}">
+            <div class="max-w-[85%] rounded-2xl px-4 py-2 shadow-sm
+                {{ 'bg-green-600 text-white rounded-tr-none' if is_me else 'bg-white text-gray-800 border rounded-tl-none' }}">
+                
+                <div class="text-[10px] mb-1 opacity-70 font-bold uppercase">
+                    {{ m[2] }} • {{ m[1].strftime("%H:%M") }}
+                </div>
+                
+                <div class="text-sm break-words">{{ m[0] }}</div>
             </div>
-            <div class="text-sm leading-relaxed">{{ m[0] }}</div>
         </div>
-    </div>
-{% endfor %}
+    {% endfor %}
+</div>
+
+<script>
+    function scrollBottom() {
+        const chatBox = document.getElementById("chat-box");
+        if (chatBox) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+    // Esegui all'avvio e dopo un piccolo ritardo per sicurezza
+    window.onload = scrollBottom;
+    setTimeout(scrollBottom, 100); 
+</script>

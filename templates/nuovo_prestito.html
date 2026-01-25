@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto bg-white p-8 rounded-xl shadow-lg border mt-10">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Nuovo Comodato d'Uso</h2>
+
+    <form method="POST">
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Attrezzatura</label>
+            <select name="prodotto_id" required
+                class="w-full border rounded-lg p-2.5 mt-1 focus:ring-2 focus:ring-red-500">
+                <option value="">Seleziona oggetto...</option>
+                {% for p in prodotti %}
+                <option value="{{ p[0] }}">{{ p[1] }} (Disp: {{ p[2] }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Nome Beneficiario</label>
+            <input type="text" name="beneficiario" required class="w-full border rounded-lg p-2.5 mt-1">
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Indirizzo / Via</label>
+            <input type="text" name="indirizzo" placeholder="Es: Via Roma 12"
+                class="w-full border rounded-lg p-2.5 mt-1">
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Telefono</label>
+            <input type="text" name="telefono" class="w-full border rounded-lg p-2.5 mt-1">
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700">Note aggiuntive</label>
+            <textarea name="note" rows="2" placeholder="Condizioni dell'oggetto, data rientro prevista..."
+                class="w-full border rounded-lg p-2.5 mt-1"></textarea>
+        </div>
+
+        <div class="flex gap-4">
+            <button type="submit"
+                class="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition shadow-lg">
+                Registra Prestito
+            </button>
+            <a href="{{ url_for('elenco_prestiti') }}"
+                class="flex-1 bg-gray-100 text-center py-3 rounded-lg font-bold hover:bg-gray-200 transition text-gray-600">
+                Annulla
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

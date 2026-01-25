@@ -1706,6 +1706,117 @@ def visualizza_tutti_i_log():
     return render_template("admin_full_logs.html", logs_pdf=logs_pdf, logs_op=logs_op)
 
 
+@app.route("/prestiti/nuovo", methods=["GET", "POST"])
+@login_required
+@ruolo_required("Amministratore")
+def nuovo_prestito():
+    conn = get_db()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        prodotto_id = request.form.get("prodotto_id")
+        beneficiario = request.form.get("beneficiario")
+        telefono = request.form.get("telefono")
+        indirizzo = request.form.get("indirizzo") # <--- NUOVO
+        note = request.form.get("note")           # <--- NUOVO
+        utente_id = session.get("user_id") 
+
+        cur.execute("""
+            INSERT INTO prestiti (prodotto_id, beneficiario, telefono, indirizzo, note, utente_id, stato, data_inizio)
+            VALUES (%s, %s, %s, %s, %s, %s, 'ATTIVO', CURRENT_TIMESTAMP)
+        """, (prodotto_id, beneficiario, telefono, indirizzo, note, utente_id))
+        
+        cur.execute("UPDATE prodotti SET quantita = quantita - 1 WHERE id = %s", (prodotto_id,))
+        
+        conn.commit()
+        conn.close()
+        flash("✅ Comodato registrato con successo!", "success")
+        return redirect(url_for('elenco_prestiti'))
+
+    cur.execute("SELECT id, nome, quantita FROM prodotti WHERE attivo=TRUE AND quantita > 0 ORDER BY nome")
+    prodotti = cur.fetchall()
+    conn.close()
+    return render_template("nuovo_prestito.html", prodotti=prodotti)
+
+@app.route("/prestiti")
+@login_required
+@ruolo_required("Amministratore")
+def elenco_prestiti():
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # Usiamo utente_id invece di mittente_id
+    cur.execute("""
+        SELECT p.id, u.username, pr.nome, p.beneficiario, p.data_inizio, p.stato, p.telefono
+        FROM prestiti p
+        JOIN prodotti pr ON p.prodotto_id = pr.id
+        LEFT JOIN utenti u ON p.utente_id = u.id
+        ORDER BY p.data_inizio DESC
+    """)
+    lista_prestiti = cur.fetchall()
+    conn.close()
+    
+    return render_template("elenco_prestiti.html", prestiti=lista_prestiti)
+
+
+@app.route("/esporta-comodato/<int:prestito_id>")
+@login_required
+@ruolo_required("Amministratore") # <--- Solo Admin può scaricare il modulo
+def esporta_comodato(prestito_id):
+    from datetime import datetime
+    
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT p.beneficiario, pr.nome, p.data_inizio 
+        FROM prestiti p
+        JOIN prodotti pr ON p.prodotto_id = pr.id
+        WHERE p.id = %s
+    """, (prestito_id,))
+    dati = cur.fetchone()
+    conn.close()
+
+    if not dati:
+        return "Prestito non trovato", 404
+
+    # Definiamo la variabile che mancava
+    data_oggi = dati[2].strftime("%d/%m/%Y") if dati[2] else datetime.now().strftime("%d/%m/%Y")
+
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Intestazione (LUNGONI ODV)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, 'Associazione Protezione Civile "LUNGONI" ODV', ln=True, align="C")
+    pdf.set_font("Arial", "", 8)
+    pdf.cell(0, 5, 'Via La Funtana, sn 07028 Santa Teresa Gallura (SS)', ln=True, align="C")
+    
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Comodato d'Uso Gratuito Attrezzature", ln=True, align="C")
+    
+    # Corpo del testo
+    pdf.set_font("Arial", "", 11)
+    pdf.ln(10)
+    testo = f"In data {data_oggi} l'Associazione concede al Sig./ra {dati[0]} in comodato d'uso gratuito la seguente attrezzatura: {dati[1]}"
+    pdf.multi_cell(0, 7, testo.encode('latin-1', 'replace').decode('latin-1'))
+    
+    # Quadratini (Esempio grafico)
+    pdf.ln(5)
+    for voce in ["Letto Degenza", "Sedia a Rotelle", "Deambulatore"]:
+        pdf.rect(15, pdf.get_y() + 2, 4, 4)
+        pdf.set_x(22)
+        pdf.cell(0, 8, voce, ln=True)
+
+    # Firme
+    pdf.set_y(220)
+    pdf.cell(95, 10, "Firma del ricevente", 0, 0, "L")
+    pdf.cell(95, 10, "per l'Associazione", 0, 1, "R")
+    
+    pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
+    return send_file(BytesIO(pdf_out), mimetype='application/pdf')
+
+
 @app.context_processor
 def inject_globals():
     if "user_id" in session:
