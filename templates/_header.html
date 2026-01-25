@@ -1,13 +1,13 @@
 <header class="bg-yellow-300 text-gray-900 p-2 sticky top-0 z-50 shadow-lg w-full">
   {# 1. DEFINIZIONE MACRO (In alto per evitare UndefinedError) #}
   {% macro mobile_link(url, icon_path, label, is_active) %}
-    <a href="{{ url }}"
-      class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-blue-600 text-white' if is_active else 'hover:bg-gray-800 text-gray-300' }}">
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
-      </svg>
-      <span class="font-medium">{{ label }}</span>
-    </a>
+  <a href="{{ url }}"
+    class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-blue-600 text-white' if is_active else 'hover:bg-gray-800 text-gray-300' }}">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
+    </svg>
+    <span class="font-medium">{{ label }}</span>
+  </a>
   {% endmacro %}
 
   <div class="flex items-center justify-between pr-4">
@@ -27,47 +27,68 @@
     {# 2. NAVIGAZIONE DESKTOP #}
     <nav class="hidden lg:flex items-center gap-1">
       {% set active = "bg-blue-600 text-white shadow-md" %}
-      {% set base = "flex items-center gap-2 px-3 py-2 rounded-xl font-semibold transition-all duration-200 hover:bg-blue-500 hover:text-white" %}
+      {% set base = "flex items-center gap-2 px-3 py-2 rounded-xl font-semibold transition-all duration-200
+      hover:bg-blue-500 hover:text-white" %}
 
-      <a href="{{ url_for('dashboard') }}" class="{{ base }} {% if request.endpoint=='dashboard' %}{{ active }}{% endif %}">
+      <a href="{{ url_for('dashboard') }}"
+        class="{{ base }} {% if request.endpoint=='dashboard' %}{{ active }}{% endif %}">
         <i class="fas fa-th-large"></i> <span>Dashboard</span>
       </a>
 
-      <a href="{{ url_for('prodotti_view') }}" class="{{ base }} {% if 'prodotti' in request.endpoint %}{{ active }}{% endif %}">
+      <a href="{{ url_for('prodotti_view') }}"
+        class="{{ base }} {% if 'prodotti' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-box"></i> <span>Prodotti</span>
       </a>
 
-      <a href="{{ url_for('categorie_view') }}" class="{{ base }} {% if 'categorie' in request.endpoint %}{{ active }}{% endif %}">
+      <a href="{{ url_for('categorie_view') }}"
+        class="{{ base }} {% if 'categorie' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-tags"></i> <span>Categorie</span>
       </a>
 
-      <a href="{{ url_for('movimenti_view') }}" class="{{ base }} {% if 'movimenti' in request.endpoint %}{{ active }}{% endif %}">
+      <a href="{{ url_for('movimenti_view') }}"
+        class="{{ base }} {% if 'movimenti' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-exchange-alt"></i> <span>Movimenti</span>
       </a>
 
-      <a href="{{ url_for('lotti_view') }}" class="{{ base }} {% if 'lotti' in request.endpoint %}{{ active }}{% endif %}">
+      <a href="{{ url_for('lotti_view') }}"
+        class="{{ base }} {% if 'lotti' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-barcode"></i> <span>Lotti</span>
       </a>
 
       {# Comodati - Solo Admin (Desktop) #}
       {% if session.get("ruolo") == "Amministratore" %}
-      <a href="{{ url_for('elenco_prestiti') }}" 
-         class="{{ base }} {% if 'prestiti' in request.endpoint %}{{ active }}{% endif %} text-red-700 font-bold border border-red-200 bg-red-50/50">
+      <a href="{{ url_for('elenco_prestiti') }}"
+        class="{{ base }} {% if 'prestiti' in request.endpoint %}{{ active }}{% endif %} text-red-700 font-bold border border-red-200 bg-red-50/50">
         <i class="fas fa-hand-holding-heart"></i> <span>Comodati</span>
       </a>
       {% endif %}
 
-      <a href="{{ url_for('utenti_view') }}" class="{{ base }} {% if 'utenti' in request.endpoint %}{{ active }}{% endif %}">
+      <a href="{{ url_for('utenti_view') }}"
+        class="{{ base }} {% if 'utenti' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-users"></i> <span>Utenti</span>
       </a>
 
       {% if session.get("ruolo") == "Amministratore" %}
-      <a href="{{ url_for('visualizza_tutti_i_log') }}" class="{{ base }} {% if request.endpoint=='visualizza_tutti_i_log' %}{{ active }}{% endif %}">
+      <a href="{{ url_for('visualizza_tutti_i_log') }}"
+        class="{{ base }} {% if request.endpoint=='visualizza_tutti_i_log' %}{{ active }}{% endif %}">
         <i class="fas fa-history"></i> <span>Attività</span>
       </a>
       {% endif %}
 
-      <a href="{{ url_for('logout') }}" class="ml-2 flex items-center gap-2 px-3 py-2 bg-gray-700 text-white rounded-xl hover:bg-red-600 transition-colors">
+      {# Profilo Utente con Icona Dinamica #}
+      <div class="flex items-center gap-2 px-3 py-2 bg-white/50 rounded-xl border border-yellow-400 ml-4">
+        {% if session.get("ruolo") == "Amministratore" %}
+        <i class="fas fa-user-shield text-red-600"></i>
+        {% elif session.get("ruolo") == "Manager" %}
+        <i class="fas fa-user-tie text-blue-700"></i>
+        {% else %}
+        <i class="fas fa-user text-gray-600"></i>
+        {% endif %}
+        <span class="text-xs font-bold uppercase">{{ session.get("username") }}</span>
+      </div>
+
+      <a href="{{ url_for('logout') }}"
+        class="ml-2 flex items-center gap-2 px-3 py-2 bg-gray-700 text-white rounded-xl hover:bg-red-600 transition-colors">
         <i class="fas fa-sign-out-alt"></i> <span>Esci</span>
       </a>
     </nav>
@@ -77,10 +98,32 @@
 <div id="overlay" class="fixed inset-0 bg-black/60 hidden z-40 backdrop-blur-sm transition-opacity"></div>
 
 {# 3. MENU MOBILE #}
-<div id="mobile-menu" class="fixed top-0 right-0 h-full w-72 bg-gray-900 text-white transform translate-x-full transition-transform duration-300 ease-in-out z-50 p-6 shadow-2xl overflow-y-auto">
+<div id="mobile-menu"
+  class="fixed top-0 right-0 h-full w-72 bg-gray-900 text-white transform translate-x-full transition-transform duration-300 ease-in-out z-50 p-6 shadow-2xl overflow-y-auto">
+  
   <div class="flex items-center justify-between mb-8 border-b border-gray-700 pb-4">
-    <span class="text-xl font-bold text-yellow-300">Menu</span>
-    <button id="close-btn" class="text-gray-400 hover:text-white">
+    <div class="flex flex-col">
+      <span class="text-xl font-bold text-yellow-300">Menu</span>
+      
+      {# INFO UTENTE LOGGATO CON ICONA DINAMICA #}
+      <div class="flex items-center gap-2 mt-2">
+        <div class="p-1.5 rounded-lg bg-gray-800 border border-gray-700">
+          {% if session.get("ruolo") == "Amministratore" %}
+            <i class="fas fa-user-shield text-red-500"></i>
+          {% elif session.get("ruolo") == "Manager" %}
+            <i class="fas fa-user-tie text-blue-400"></i>
+          {% else %}
+            <i class="fas fa-user text-green-400"></i>
+          {% endif %}
+        </div>
+        <div class="flex flex-col">
+          <span class="text-sm font-bold leading-none">{{ session.get("username") }}</span>
+          <span class="text-[10px] text-gray-500 uppercase tracking-wider">{{ session.get("ruolo") }}</span>
+        </div>
+      </div>
+    </div>
+
+    <button id="close-btn" class="text-gray-400 hover:text-white transition-colors">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path d="M6 18L18 6M6 6l12 12" stroke-width="2" />
       </svg>
@@ -88,16 +131,19 @@
   </div>
 
   <nav class="flex flex-col gap-4">
+    {# Link esistenti... (Dashboard, Prodotti, ecc.) #}
     {{ mobile_link(url_for('dashboard'), 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 'Dashboard', request.endpoint=='dashboard') }}
+    
+    {# Restante parte della navigazione ... #}
     {{ mobile_link(url_for('prodotti_view'), 'M20 7H4v10h16V7z', 'Prodotti', 'prodotti' in request.endpoint) }}
     {{ mobile_link(url_for('categorie_view'), 'M3 7h18M3 12h18M3 17h18', 'Categorie', 'categorie' in request.endpoint) }}
     {{ mobile_link(url_for('movimenti_view'), 'M7 16l-4-4 4-4m10 8l4-4-4-4', 'Movimenti', 'movimenti' in request.endpoint) }}
     {{ mobile_link(url_for('lotti_view'), 'M20 7l-8-4-8 4v10l8 4 8-4V7z', 'Lotti', 'lotti' in request.endpoint) }}
 
-    {# Comodati nel Mobile #}
+    {# Comodati - Solo Admin #}
     {% if session.get("ruolo") == "Amministratore" %}
-    <a href="{{ url_for('elenco_prestiti') }}" 
-       class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-red-600 text-white' if 'prestiti' in request.endpoint else 'hover:bg-gray-800 text-red-400' }}">
+    <a href="{{ url_for('elenco_prestiti') }}"
+      class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-red-600 text-white' if 'prestiti' in request.endpoint else 'hover:bg-gray-800 text-red-400' }}">
       <i class="fas fa-hand-holding-heart text-xl"></i>
       <span class="font-medium">Gestione Comodati</span>
     </a>
@@ -110,7 +156,8 @@
     {% endif %}
 
     <div class="mt-6 pt-6 border-t border-gray-700">
-      <a href="{{ url_for('logout') }}" class="flex items-center gap-4 px-4 py-3 rounded-xl bg-red-900/30 text-red-400 hover:bg-red-900/50">
+      <a href="{{ url_for('logout') }}"
+        class="flex items-center gap-4 px-4 py-3 rounded-xl bg-red-900/30 text-red-400 hover:bg-red-900/50 transition-all">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M17 16l4-4m0 0l-4-4m4 4H7" />
         </svg>

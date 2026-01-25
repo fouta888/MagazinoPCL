@@ -1714,29 +1714,50 @@ def nuovo_prestito():
     cur = conn.cursor()
 
     if request.method == "POST":
-        prodotto_id = request.form.get("prodotto_id")
+        # Usiamo getlist per recuperare tutti gli ID selezionati dai checkbox
+        prodotti_selezionati = request.form.getlist("prodotto_id")
         beneficiario = request.form.get("beneficiario")
         telefono = request.form.get("telefono")
-        indirizzo = request.form.get("indirizzo") # <--- NUOVO
-        note = request.form.get("note")           # <--- NUOVO
-        utente_id = session.get("user_id") 
+        indirizzo = request.form.get("indirizzo")
+        note = request.form.get("note")
+        utente_id = session.get("user_id")
 
-        cur.execute("""
-            INSERT INTO prestiti (prodotto_id, beneficiario, telefono, indirizzo, note, utente_id, stato, data_inizio)
-            VALUES (%s, %s, %s, %s, %s, %s, 'ATTIVO', CURRENT_TIMESTAMP)
-        """, (prodotto_id, beneficiario, telefono, indirizzo, note, utente_id))
-        
-        cur.execute("UPDATE prodotti SET quantita = quantita - 1 WHERE id = %s", (prodotto_id,))
-        
-        conn.commit()
-        conn.close()
-        flash("✅ Comodato registrato con successo!", "success")
-        return redirect(url_for('elenco_prestiti'))
+        if not prodotti_selezionati:
+            flash("❌ Errore: Seleziona almeno un oggetto!", "danger")
+            # È fondamentale fare un return anche qui!
+            return redirect(url_for('nuovo_prestito'))
 
+        try:
+            # Cicliamo su ogni prodotto selezionato
+            for p_id in prodotti_selezionati:
+                cur.execute("""
+                    INSERT INTO prestiti (prodotto_id, beneficiario, telefono, indirizzo, note, utente_id, stato, data_inizio)
+                    VALUES (%s, %s, %s, %s, %s, %s, 'ATTIVO', CURRENT_TIMESTAMP)
+                """, (p_id, beneficiario, telefono, indirizzo, note, utente_id))
+                
+                # Scaliamo la giacenza per ogni oggetto
+                cur.execute("UPDATE prodotti SET quantita = quantita - 1 WHERE id = %s", (p_id,))
+            
+            conn.commit()
+            flash(f"✅ Registrati {len(prodotti_selezionati)} oggetti per {beneficiario}", "success")
+            return redirect(url_for('elenco_prestiti'))
+        
+        except Exception as e:
+            conn.rollback()
+            flash(f"❌ Errore durante il salvataggio: {e}", "danger")
+            return redirect(url_for('nuovo_prestito'))
+        finally:
+            conn.close()
+
+    # --- CASO GET (Caricamento pagina) ---
+    # Questa parte deve essere fuori dall'if POST
     cur.execute("SELECT id, nome, quantita FROM prodotti WHERE attivo=TRUE AND quantita > 0 ORDER BY nome")
     prodotti = cur.fetchall()
     conn.close()
+    
+    # Assicurati che questo return sia presente e allineato correttamente
     return render_template("nuovo_prestito.html", prodotti=prodotti)
+
 
 @app.route("/prestiti")
 @login_required
@@ -1745,12 +1766,20 @@ def elenco_prestiti():
     conn = get_db()
     cur = conn.cursor()
     
-    # Usiamo utente_id invece di mittente_id
+    # Abbiamo aggiunto u.username nella clausola GROUP BY
     cur.execute("""
-        SELECT p.id, u.username, pr.nome, p.beneficiario, p.data_inizio, p.stato, p.telefono
+        SELECT 
+            MIN(p.id), 
+            u.username, 
+            STRING_AGG(pr.nome, ', '), 
+            p.beneficiario, 
+            p.data_inizio, 
+            p.stato, 
+            p.indirizzo
         FROM prestiti p
         JOIN prodotti pr ON p.prodotto_id = pr.id
         LEFT JOIN utenti u ON p.utente_id = u.id
+        GROUP BY u.username, p.beneficiario, p.data_inizio, p.stato, p.indirizzo
         ORDER BY p.data_inizio DESC
     """)
     lista_prestiti = cur.fetchall()
@@ -1759,16 +1788,43 @@ def elenco_prestiti():
     return render_template("elenco_prestiti.html", prestiti=lista_prestiti)
 
 
+@app.route("/prestiti/ritorno/<int:prestito_id>")
+@login_required
+@ruolo_required("Amministratore")
+def registra_ritorno(prestito_id):
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # 1. Recupera l'ID del prodotto prima di segnare come restituito
+    cur.execute("SELECT prodotto_id, stato FROM prestiti WHERE id = %s", (prestito_id,))
+    prestito = cur.fetchone()
+    
+    if prestito and prestito[1] == 'ATTIVO':
+        # 2. Segna come RESTITUITO
+        cur.execute("UPDATE prestiti SET stato = 'RESTITUITO' WHERE id = %s", (prestito_id,))
+        # 3. Incrementa di nuovo la quantità in magazzino
+        cur.execute("UPDATE prodotti SET quantita = quantita + 1 WHERE id = %s", (prestito[0],))
+        conn.commit()
+        flash("✅ Oggetto riportato in magazzino correttamente!", "success")
+    
+    conn.close()
+    return redirect(url_for('elenco_prestiti'))
+
+
+
 @app.route("/esporta-comodato/<int:prestito_id>")
 @login_required
-@ruolo_required("Amministratore") # <--- Solo Admin può scaricare il modulo
+@ruolo_required("Amministratore")
 def esporta_comodato(prestito_id):
     from datetime import datetime
+    import os
+    from io import BytesIO
     
     conn = get_db()
     cur = conn.cursor()
+    # Recuperiamo i dati del singolo prestito
     cur.execute("""
-        SELECT p.beneficiario, pr.nome, p.data_inizio 
+        SELECT p.beneficiario, pr.nome, p.data_inizio, p.indirizzo, p.telefono, p.note
         FROM prestiti p
         JOIN prodotti pr ON p.prodotto_id = pr.id
         WHERE p.id = %s
@@ -1777,44 +1833,173 @@ def esporta_comodato(prestito_id):
     conn.close()
 
     if not dati:
-        return "Prestito non trovato", 404
+        flash("Prestito non trovato", "danger")
+        return redirect(url_for('elenco_prestiti'))
 
-    # Definiamo la variabile che mancava
-    data_oggi = dati[2].strftime("%d/%m/%Y") if dati[2] else datetime.now().strftime("%d/%m/%Y")
+    beneficiario, nome_prodotto, data_inizio, indirizzo, telefono, note = dati
+    data_str = data_inizio.strftime("%d/%m/%Y") if data_inizio else datetime.now().strftime("%d/%m/%Y")
 
     pdf = FPDF()
     pdf.add_page()
     
-    # Intestazione (LUNGONI ODV)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, 'Associazione Protezione Civile "LUNGONI" ODV', ln=True, align="C")
-    pdf.set_font("Arial", "", 8)
-    pdf.cell(0, 5, 'Via La Funtana, sn 07028 Santa Teresa Gallura (SS)', ln=True, align="C")
+    # --- LOGO E INTESTAZIONE ---
+    logo_path = os.path.join('static', 'Magazzino.jpg')
+    if os.path.exists(logo_path):
+        pdf.image(logo_path, 12, 10, 28)
     
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Comodato d'Uso Gratuito Attrezzature", ln=True, align="C")
-    
-    # Corpo del testo
-    pdf.set_font("Arial", "", 11)
-    pdf.ln(10)
-    testo = f"In data {data_oggi} l'Associazione concede al Sig./ra {dati[0]} in comodato d'uso gratuito la seguente attrezzatura: {dati[1]}"
-    pdf.multi_cell(0, 7, testo.encode('latin-1', 'replace').decode('latin-1'))
-    
-    # Quadratini (Esempio grafico)
-    pdf.ln(5)
-    for voce in ["Letto Degenza", "Sedia a Rotelle", "Deambulatore"]:
-        pdf.rect(15, pdf.get_y() + 2, 4, 4)
-        pdf.set_x(22)
-        pdf.cell(0, 8, voce, ln=True)
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_x(45)
+    pdf.cell(0, 8, 'Associazione Protezione Civile "LUNGONI" ODV', ln=True)
+    pdf.set_font("Arial", "", 10)
+    pdf.set_x(45)
+    pdf.cell(0, 5, 'Via La Funtana, sn - 07028 Santa Teresa Gallura (SS)', ln=True)
+    pdf.ln(20)
 
-    # Firme
-    pdf.set_y(220)
-    pdf.cell(95, 10, "Firma del ricevente", 0, 0, "L")
-    pdf.cell(95, 10, "per l'Associazione", 0, 1, "R")
+    # --- TITOLO ---
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "COMODATO D'USO GRATUITO", ln=True, align="C")
+    pdf.ln(10)
+    
+    # --- DATI BENEFICIARIO ---
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 10, f"In data {data_str}, l'Associazione concede al Sig./ra:", ln=True)
+    
+    pdf.set_font("Arial", "B", 13)
+    pdf.cell(0, 8, f"SOGGETTO: {beneficiario.upper()}", ln=True)
+    
+    pdf.set_font("Arial", "", 11)
+    if indirizzo and indirizzo.strip():
+        pdf.cell(0, 7, f"RESIDENTE IN: {indirizzo.strip()}", ln=True)
+    if telefono and telefono.strip():
+        pdf.cell(0, 7, f"RECAPITO TEL: {telefono.strip()}", ln=True)
+
+    pdf.ln(15) 
+
+    # --- OGGETTO ---
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "ATTREZZATURA CONSEGNATA:", ln=True)
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_fill_color(245, 245, 245)
+    pdf.cell(0, 12, f"  {nome_prodotto}", border=1, ln=True, fill=True)
+    
+    if note and note.strip():
+        pdf.ln(5)
+        pdf.set_font("Arial", "I", 10)
+        pdf.multi_cell(0, 6, f"Note: {note.strip()}".encode('latin-1', 'replace').decode('latin-1'))
+
+    # --- PRIVACY E FIRME ---
+    pdf.set_y(-65)
+    pdf.set_font("Arial", "I", 8)
+    privacy = "Informativa Privacy: Trattamento dati conforme al GDPR UE 2016/679."
+    pdf.multi_cell(0, 4, privacy.encode('latin-1', 'replace').decode('latin-1'), align="C")
+
+    pdf.ln(10)
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(95, 10, "Firma del ricevente", 0, 0, "C")
+    pdf.cell(95, 10, "Per l'Associazione", 0, 1, "C")
     
     pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
-    return send_file(BytesIO(pdf_out), mimetype='application/pdf')
+    return send_file(BytesIO(pdf_out), mimetype='application/pdf', as_attachment=False, download_name=f"Comodato_{beneficiario}.pdf")
+
+
+@app.route("/esporta-comodato-multiplo/<string:beneficiario>")
+@login_required
+@ruolo_required("Amministratore")
+def esporta_comodato_multiplo(beneficiario):
+    from datetime import datetime
+    import os
+    from io import BytesIO
+    
+    conn = get_db()
+    cur = conn.cursor()
+    # Recuperiamo TUTTI i prodotti attivi per questo beneficiario
+    cur.execute("""
+        SELECT pr.nome, p.data_inizio, p.indirizzo, p.telefono, p.note
+        FROM prestiti p
+        JOIN prodotti pr ON p.prodotto_id = pr.id
+        WHERE p.beneficiario = %s AND p.stato = 'ATTIVO'
+        ORDER BY p.data_inizio DESC
+    """, (beneficiario,))
+    oggetti = cur.fetchall()
+    conn.close()
+
+    if not oggetti:
+        flash(f"Nessun oggetto attivo trovato per {beneficiario}", "warning")
+        return redirect(url_for('elenco_prestiti'))
+
+    # Usiamo i dati comuni dal primo record (indirizzo e telefono sono uguali)
+    nome_prodotto_primo, data_inizio, indirizzo, telefono, note_singola = oggetti[0]
+    data_str = datetime.now().strftime("%d/%m/%Y") # Data di stampa del documento
+
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # --- LOGO E INTESTAZIONE ---
+    logo_path = os.path.join('static', 'Magazzino.jpg')
+    if os.path.exists(logo_path):
+        pdf.image(logo_path, 12, 10, 28)
+    
+    pdf.set_font("Arial", "B", 14)
+    pdf.set_x(45)
+    pdf.cell(0, 8, 'Associazione Protezione Civile "LUNGONI" ODV', ln=True)
+    pdf.set_font("Arial", "", 10)
+    pdf.set_x(45)
+    pdf.cell(0, 5, 'Via La Funtana, sn - 07028 Santa Teresa Gallura (SS)', ln=True)
+    pdf.ln(20)
+
+    # --- TITOLO ---
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "COMODATO D'USO GRATUITO - RIEPILOGO", ln=True, align="C")
+    pdf.ln(10)
+    
+    # --- DATI BENEFICIARIO ---
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 10, f"In data odierna {data_str}, si conferma il prestito al Sig./ra:", ln=True)
+    
+    pdf.set_font("Arial", "B", 13)
+    pdf.cell(0, 8, f"SOGGETTO: {beneficiario.upper()}", ln=True)
+    
+    pdf.set_font("Arial", "", 11)
+    if indirizzo and indirizzo.strip():
+        pdf.cell(0, 7, f"RESIDENTE IN: {indirizzo.strip()}", ln=True)
+    if telefono and telefono.strip():
+        pdf.cell(0, 7, f"RECAPITO TEL: {telefono.strip()}", ln=True)
+
+    pdf.ln(15) 
+
+    # --- ELENCO ATTREZZATURE CONSEGNATE ---
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "ELENCO ATTREZZATURE IN CARICO:", ln=True)
+    
+    pdf.set_font("Arial", "", 12)
+    pdf.set_fill_color(245, 245, 245)
+    
+    for obj in oggetti:
+        # obj[0] è il nome del prodotto, obj[1] è la data inizio
+        info_riga = f" - {obj[0]} (consegnato il {obj[1].strftime('%d/%m/%Y')})"
+        pdf.cell(0, 10, info_riga.encode('latin-1', 'replace').decode('latin-1'), border='B', ln=True, fill=True)
+    
+    # --- NOTE CUMULATIVE ---
+    pdf.ln(10)
+    pdf.set_font("Arial", "I", 10)
+    pdf.cell(0, 5, "Note: Il beneficiario è responsabile della corretta conservazione di tutti gli oggetti elencati.", ln=True)
+
+    # --- INFORMATIVA PRIVACY ---
+    pdf.set_y(-65)
+    pdf.set_font("Arial", "I", 8)
+    privacy = ("Informativa Privacy: I dati personali raccolti sono trattati dall'Associazione esclusivamente per "
+               "la gestione del presente comodato, in conformità al Regolamento UE 2016/679 (GDPR).")
+    pdf.multi_cell(0, 4, privacy.encode('latin-1', 'replace').decode('latin-1'), align="C")
+
+    # --- FIRME ---
+    pdf.ln(10)
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(95, 10, "Firma del ricevente (Comodatario)", 0, 0, "C")
+    pdf.cell(95, 10, "Per l'Associazione (Il Presidente/Delegato)", 0, 1, "C")
+    
+    pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
+    return send_file(BytesIO(pdf_out), mimetype='application/pdf', as_attachment=False, download_name=f"Riepilogo_{beneficiario}.pdf")
+
 
 
 @app.context_processor

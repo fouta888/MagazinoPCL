@@ -31,25 +31,47 @@
     </thead>
     <tbody class="divide-y text-gray-800">
       {% for m in movimenti %}
-      <tr data-tipo="{{ m[2] }}">
-        <td class="px-4 py-2">{{ m[0] }}</td>
-        <td class="px-4 py-2">{{ m[1] }}</td>
-        <td class="px-4 py-2">
-          {% if m[2] == 'entrata' %}
-          <span class="text-green-600 font-bold">Entrata</span>
+      <tr data-tipo="{{ m[2] }}"
+        class="{{ 'bg-green-50/30' if m[2] == 'entrata' else 'bg-red-50/30' }} hover:bg-gray-100 transition">
+        <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ m[0] }}</td>
+
+        <td class="px-4 py-2 whitespace-nowrap">
+          {% if m[1] is string %}
+          {{ m[1][:16] }}
           {% else %}
-          <span class="text-red-600 font-bold">Uscita</span>
+          {{ m[1].strftime('%d/%m/%Y %H:%M') }}
           {% endif %}
         </td>
-        <td class="px-4 py-2">{{ m[4] }}</td>
-        <td class="px-4 py-2">{{ m[3] }}</td>
-        <td class="px-4 py-2">{{ m[5] if m[5] else "—" }}</td>
+
+        <td class="px-4 py-2">
+          {% if m[2] == 'entrata' %}
+          <span class="text-green-600 font-bold"><i class="fas fa-arrow-down fa-xs"></i> Entrata</span>
+          {% else %}
+          <span class="text-red-600 font-bold"><i class="fas fa-arrow-up fa-xs"></i> Uscita</span>
+          {% endif %}
+        </td>
+
+        <td class="px-4 py-2 font-semibold">{{ m[4] }}</td>
+        <td class="px-4 py-2 font-bold">{{ m[3] }}</td>
+
+        <td class="px-4 py-2 text-gray-600">
+          {% if m[5] %}
+          {% if m[5] is string %}
+          {{ m[5] }}
+          {% else %}
+          {{ m[5].strftime('%d/%m/%Y') }}
+          {% endif %}
+          {% else %}
+          —
+          {% endif %}
+        </td>
+
         <td class="px-4 py-2">{{ m[6] }}</td>
-        <td class="px-4 py-2">{{ m[7] if m[7] else "—" }}</td>
+        <td class="px-4 py-2 italic text-gray-500 text-xs">{{ m[7] if m[7] else "—" }}</td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="8" class="text-center py-4 text-gray-500">Nessun movimento disponibile</td>
+        <td colspan="8" class="text-center py-8 text-gray-400 italic">Nessun movimento registrato.</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -60,36 +82,48 @@
 <script>
   const searchInput = document.getElementById("searchInput");
   const fifoToggle = document.getElementById("fifoToggle");
+  let fifoActive = false;
 
   function filterTable() {
-    const input = searchInput.value.toLowerCase();
+    const searchText = searchInput.value.toLowerCase();
     const rows = document.querySelectorAll("#movimentiTable tbody tr");
 
     rows.forEach(row => {
+      const tipo = row.dataset.tipo;
       const cells = Array.from(row.querySelectorAll("td"));
-      const match = cells.some(td => td.textContent.toLowerCase().includes(input));
-      row.style.display = match ? "" : "none";
+
+      // Verifica se la riga contiene il testo cercato
+      const matchesSearch = cells.some(td => td.textContent.toLowerCase().includes(searchText));
+
+      // Verifica se la riga rispetta il filtro FIFO (solo uscite)
+      const matchesFIFO = !fifoActive || tipo === "uscita";
+
+      // La riga appare solo se soddisfa ENTRAMBI i criteri
+      if (matchesSearch && matchesFIFO) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
     });
   }
 
-  // Toggle solo uscita FIFO
-  let fifoActive = false;
-  fifoToggle.addEventListener("click", () => {
+  // Listener per la ricerca testuale
+  searchInput.addEventListener("keyup", filterTable);
+
+  // Listener per il bottone FIFO
+  fifoToggle.addEventListener("click", function () {
     fifoActive = !fifoActive;
-    fifoToggle.textContent = fifoActive ? "Mostra tutti i movimenti" : "Mostra solo uscita (FIFO)";
 
-    const rows = document.querySelectorAll("#movimentiTable tbody tr");
-    rows.forEach(row => {
-      const tipo = row.dataset.tipo;
-      if (!tipo) return;
-      if (fifoActive) {
-        row.style.display = tipo === "uscita" ? "" : "none";
-      } else {
-        row.style.display = "";
-      }
-    });
+    // Cambia stile e testo al bottone
+    if (fifoActive) {
+      this.textContent = "Mostra tutti i movimenti";
+      this.classList.replace('bg-blue-600', 'bg-gray-600');
+    } else {
+      this.textContent = "Mostra solo uscita (FIFO)";
+      this.classList.replace('bg-gray-600', 'bg-blue-600');
+    }
 
-    filterTable(); // Applica anche filtro ricerca
+    filterTable(); // Riesegue il filtro globale
   });
 </script>
 

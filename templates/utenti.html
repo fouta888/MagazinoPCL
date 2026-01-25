@@ -6,85 +6,127 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestione Utenti</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
-<body class="bg-blue-800">
+<body class="bg-blue-800 min-h-screen">
   {% include "_header.html" %}
 
-  <main class="max-w-5xl mx-auto p-2 space-y-6">
+  <main class="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
 
-    <h1 class="text-3xl font-bold text-yellow-400">Gestione Utenti</h1>
+    <h1 class="text-2xl md:text-3xl font-bold text-yellow-400 flex items-center gap-3">
+      <i class="fas fa-users-cog"></i> Gestione Utenti
+    </h1>
 
     {% if session['ruolo'] == 'Amministratore' %}
-    <section class="bg-white p-6 rounded-xl shadow-md space-y-4">
-      <h2 class="text-xl font-semibold">Aggiungi Nuovo Utente</h2>
-      <form method="POST" class="space-y-3">
-        <input type="text" name="username" placeholder="Username" required class="w-full border p-2 rounded-lg" />
-        <input type="password" name="password" placeholder="Password" required class="w-full border p-2 rounded-lg" />
-        <select name="ruolo" required class="w-full border p-2 rounded-lg">
-          {% for r in ruoli %}
-          <option value="{{ r[0] }}">{{ r[1] }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Aggiungi</button>
+    <section class="bg-white p-4 md:p-6 rounded-xl shadow-lg space-y-4">
+      <h2 class="text-xl font-semibold text-gray-800 italic border-b pb-2">Aggiungi Nuovo Utente</h2>
+      <form method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-gray-500 uppercase">Username</label>
+          <input type="text" name="username" placeholder="Username" required 
+                 class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-gray-500 uppercase">Password</label>
+          <input type="password" name="password" placeholder="Password" required 
+                 class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+        </div>
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-gray-500 uppercase">Ruolo</label>
+          <select name="ruolo" required class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+            {% for r in ruoli %}
+            <option value="{{ r[0] }}">{{ r[1] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="bg-green-600 text-white font-bold p-2 rounded-lg hover:bg-green-700 shadow-md transition-all">
+          <i class="fas fa-plus-circle"></i> Aggiungi
+        </button>
       </form>
     </section>
     {% endif %}
 
-    <section class="bg-white p-6 rounded-xl shadow-md space-y-4">
-      <h2 class="text-xl font-semibold">Utenti Esistenti</h2>
-      <table class="min-w-full border-collapse">
-        <thead>
-          <tr class="bg-gray-200 text-left">
-            {% if session['ruolo'] == 'Amministratore' %}
-            <th class="p-2 border">ID</th>
-            {% endif %}
-            <th class="p-2 border">Username</th>
-            {% if session['ruolo'] == 'Amministratore' %}
-            <th class="p-2 border">Ruolo</th>
-            <th class="p-2 border">Attivo</th>
-            {% endif %}
-            <th class="p-2 border">Azioni</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in utenti %}
-          <tr class="border-t">
-            {% if session['ruolo'] == 'Amministratore' %}
-            <td class="p-2 border">{{ u[0] }}</td>
-            {% endif %}
-
-            <td class="p-2 border font-medium text-gray-700">{{ u[1] }}</td>
-
-            {% if session['ruolo'] == 'Amministratore' %}
-            <td class="p-2 border">{{ u[2] }}</td>
-            <td class="p-2 border">{{ 'Sì' if u[3] else 'No' }}</td>
-            {% endif %}
-
-            <td class="p-2 border space-x-2">
+    <section class="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div class="p-4 md:p-6 border-b">
+        <h2 class="text-xl font-semibold text-gray-800">Utenti Esistenti</h2>
+      </div>
+      
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left border-collapse">
+          <thead class="bg-gray-100 text-gray-600 uppercase text-[11px] font-bold">
+            <tr>
               {% if session['ruolo'] == 'Amministratore' %}
-              <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}" class="text-blue-600 hover:underline">✏️
-                Modifica</a>
-              <a href="{{ url_for('elimina_utente', utente_id=u[0]) }}" class="text-red-600 hover:underline"
-                onclick="return confirm('Sei sicuro?');">🗑️ Elimina</a>
-              {% else %}
-              <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}"
-                class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-600">
-                🔑 Cambia Password
-              </a>
+              <th class="p-4 border-b">ID</th>
               {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              <th class="p-4 border-b">Username</th>
+              {% if session['ruolo'] == 'Amministratore' %}
+              <th class="p-4 border-b">Ruolo</th>
+              <th class="p-4 border-b">Stato</th>
+              {% endif %}
+              <th class="p-4 border-b text-center">Azioni</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {% for u in utenti %}
+            <tr class="hover:bg-gray-50 transition">
+              {% if session['ruolo'] == 'Amministratore' %}
+              <td class="p-4 text-gray-400 font-mono text-xs">{{ u[0] }}</td>
+              {% endif %}
+
+              <td class="p-4 font-bold text-gray-700">
+                <i class="fas fa-user-circle text-blue-500 mr-2"></i> {{ u[1] }}
+              </td>
+
+              {% if session['ruolo'] == 'Amministratore' %}
+              <td class="p-4">
+                <span class="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold">
+                  {{ u[2] }}
+                </span>
+              </td>
+              <td class="p-4">
+                {% if u[3] %}
+                  <span class="text-green-600 bg-green-100 px-2 py-1 rounded text-xs font-bold italic">Attivo</span>
+                {% else %}
+                  <span class="text-red-600 bg-red-100 px-2 py-1 rounded text-xs font-bold italic">Disattivo</span>
+                {% endif %}
+              </td>
+              {% endif %}
+
+              <td class="p-4 text-center">
+                <div class="flex flex-wrap justify-center gap-2">
+                  {% if session['ruolo'] == 'Amministratore' %}
+                  <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}" 
+                     class="bg-blue-100 text-blue-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-blue-200">
+                    <i class="fas fa-edit"></i> <span class="hidden sm:inline">Modifica</span>
+                  </a>
+                  <a href="{{ url_for('elimina_utente', utente_id=u[0]) }}" 
+                     class="bg-red-100 text-red-600 px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-200"
+                     onclick="return confirm('Sei sicuro di voler eliminare questo utente?');">
+                    <i class="fas fa-trash"></i> <span class="hidden sm:inline">Elimina</span>
+                  </a>
+                  {% else %}
+                  <a href="{{ url_for('modifica_utente', utente_id=u[0]) }}"
+                    class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-yellow-600">
+                    <i class="fas fa-key"></i> Cambia Password
+                  </a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </section>
 
-    <div class="space-x-4 mt-4 p-2">
-      <a href="{{ url_for('dashboard') }}" class="text-white py-1 px-2 bg-gray-400 rounded-xl hover:text-red-600">Torna
-        alla Dashboard</a>
-      <a href="{{ url_for('logout') }}"
-        class="text-white py-1 px-4 bg-gray-400 rounded-xl hover:text-red-600">Logout</a>
+    <div class="flex flex-col sm:flex-row gap-3 mt-6">
+      <a href="{{ url_for('dashboard') }}" class="text-center text-sm text-white py-2 px-4 bg-gray-500/50 rounded-lg hover:bg-gray-600 transition">
+        <i class="fas fa-tachometer-alt"></i> Dashboard
+      </a>
+      <a href="{{ url_for('logout') }}" class="text-center text-sm text-white py-2 px-4 bg-red-600/80 rounded-lg hover:bg-red-700 transition">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </a>
     </div>
 
   </main>
