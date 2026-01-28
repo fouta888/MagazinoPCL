@@ -51,6 +51,17 @@
         <i class="fas fa-users text-base"></i> <span class="hidden xl:block 2xl:inline">Utenti</span>
       </a>
 
+      {% if session.get("ruolo") == "Amministratore" %}
+
+      <a href="{{ url_for('visualizza_tutti_i_log') }}"
+        class="{{ base }} {% if request.endpoint=='visualizza_tutti_i_log' %}{{ active }}{% endif %}">
+
+        <i class="fas fa-history"></i> <span class="hidden xl:inline">Attività</span>
+
+      </a>
+
+      {% endif %}
+
       <a href="{{ url_for('messaggi') }}"
         class="{{ base }} {% if 'messaggi' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-envelope text-base"></i> <span class="hidden xl:block 2xl:inline">Messaggi</span>

@@ -3,12 +3,12 @@
 
 <div class="max-w-6xl mx-auto">
     <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl text-yellow-500 font-bold">📂 Registri Sistema Completi</h1>
-    <a href="{{ url_for('esporta_pdf') }}" id="btn-esporta"
-        class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm">
-        📄 Esporta PDF Selezione
-    </a>
-</div>
+        <h1 class="text-2xl text-yellow-500 font-bold">📂 Registri Sistema Completi</h1>
+        <a href="{{ url_for('esporta_pdf') }}" id="btn-esporta"
+            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm">
+            📄 Esporta PDF Selezione
+        </a>
+    </div>
 
     <div class="flex space-x-4 mb-6 border-b">
         <button onclick="switchTab('op')" id="btn-op"
@@ -84,7 +84,7 @@
             tabPdf.classList.add('hidden');
             btnOp.className = "py-2 px-4 border-b-2 border-green-500 text-green-600 font-bold";
             btnPdf.className = "py-2 px-4 border-b-2 border-transparent text-gray-500";
-            
+
             // Cambia il pulsante per stampare i Movimenti
             btnEsporta.href = "{{ url_for('esporta_pdf_audit') }}";
             btnEsporta.innerText = "📄 Esporta Solo Movimenti";
@@ -94,9 +94,9 @@
             tabPdf.classList.remove('hidden');
             btnPdf.className = "py-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold";
             btnOp.className = "py-2 px-4 border-b-2 border-transparent text-gray-500";
-            
+
             // Cambia il pulsante per stampare il Registro Download
-            btnEsporta.href = "{{ url_for('esporta_pdf') }}"; 
+            btnEsporta.href = "{{ url_for('esporta_pdf') }}";
             btnEsporta.innerText = "📄 Esporta Registro Download";
         }
     }
