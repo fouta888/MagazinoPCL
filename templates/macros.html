@@ -1,0 +1,9 @@
+{% macro mobile_link(url, icon_path, label, is_active) %}
+<a href="{{ url }}"
+   class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-blue-600 text-white' if is_active else 'hover:bg-gray-800 text-gray-300' }}">
+   <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+     <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
+   </svg>
+   <span class="font-medium">{{ label }}</span>
+</a>
+{% endmacro %}

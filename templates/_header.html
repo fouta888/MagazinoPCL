@@ -1,97 +1,91 @@
+{% from "macros.html" import mobile_link with context %}
 <header class="bg-yellow-300 text-gray-900 p-2 sticky top-0 z-50 shadow-lg w-full">
-  {# 1. DEFINIZIONE MACRO (In alto per evitare UndefinedError) #}
-  {% macro mobile_link(url, icon_path, label, is_active) %}
-  <a href="{{ url }}"
-    class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-blue-600 text-white' if is_active else 'hover:bg-gray-800 text-gray-300' }}">
-    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
-    </svg>
-    <span class="font-medium">{{ label }}</span>
-  </a>
-  {% endmacro %}
+  <div class="max-w-[1600px] mx-auto flex items-center justify-between px-2 md:px-4">
 
-  <div class="flex items-center justify-between pr-4">
-    {# Logo e Titolo #}
-    <div class="flex items-center space-x-3">
-      <img src="{{ url_for('static', filename='Magazzino.jpg') }}" class="h-10 rounded-lg">
-      <span class="text-xl font-bold tracking-tight">Magazzino PCL</span>
+    {# Logo - Ridimensionato per risparmiare spazio #}
+    <div class="flex items-center space-x-2 shrink-0">
+      <img src="{{ url_for('static', filename='Magazzino.jpg') }}" class="h-8 w-8 md:h-9 md:w-9 rounded-lg shadow-sm">
+      <span class="text-base md:text-lg font-bold tracking-tighter hidden sm:inline">Magazzino PCL</span>
     </div>
 
-    {# Bottone Menu Mobile #}
-    <button id="menu-btn" class="lg:hidden p-2 hover:bg-yellow-400 rounded-lg transition">
-      <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </button>
-
-    {# 2. NAVIGAZIONE DESKTOP #}
-    <nav class="hidden lg:flex items-center gap-1">
-      {% set active = "bg-blue-600 text-white shadow-md" %}
-      {% set base = "flex items-center gap-2 px-3 py-2 rounded-xl font-semibold transition-all duration-200
-      hover:bg-blue-500 hover:text-white" %}
+    {# 2. NAVIGAZIONE DESKTOP OTTIMIZZATA #}
+    <nav class="hidden lg:flex items-center gap-0.5 xl:gap-1">
+      {% set active = "bg-blue-600 text-white shadow-md scale-105" %}
+      {% set base = "flex items-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all duration-200
+      hover:bg-blue-500 hover:text-white text-[13px]" %}
 
       <a href="{{ url_for('dashboard') }}"
         class="{{ base }} {% if request.endpoint=='dashboard' %}{{ active }}{% endif %}">
-        <i class="fas fa-th-large"></i> <span>Dashboard</span>
+        <i class="fas fa-th-large text-base"></i> <span class="hidden xl:block 2xl:inline">Dashboard</span>
       </a>
 
       <a href="{{ url_for('prodotti_view') }}"
         class="{{ base }} {% if 'prodotti' in request.endpoint %}{{ active }}{% endif %}">
-        <i class="fas fa-box"></i> <span>Prodotti</span>
+        <i class="fas fa-box text-base"></i> <span class="hidden xl:block 2xl:inline">Prodotti</span>
       </a>
 
       <a href="{{ url_for('categorie_view') }}"
         class="{{ base }} {% if 'categorie' in request.endpoint %}{{ active }}{% endif %}">
-        <i class="fas fa-tags"></i> <span>Categorie</span>
+        <i class="fas fa-tags text-base"></i> <span class="hidden xl:block 2xl:inline">Categorie</span>
       </a>
 
       <a href="{{ url_for('movimenti_view') }}"
         class="{{ base }} {% if 'movimenti' in request.endpoint %}{{ active }}{% endif %}">
-        <i class="fas fa-exchange-alt"></i> <span>Movimenti</span>
+        <i class="fas fa-exchange-alt text-base"></i> <span class="hidden xl:block 2xl:inline">Movimenti</span>
       </a>
 
       <a href="{{ url_for('lotti_view') }}"
         class="{{ base }} {% if 'lotti' in request.endpoint %}{{ active }}{% endif %}">
-        <i class="fas fa-barcode"></i> <span>Lotti</span>
+        <i class="fas fa-barcode text-base"></i> <span class="hidden xl:block 2xl:inline">Lotti</span>
       </a>
 
-      {# Comodati - Solo Admin (Desktop) #}
       {% if session.get("ruolo") == "Amministratore" %}
       <a href="{{ url_for('elenco_prestiti') }}"
-        class="{{ base }} {% if 'prestiti' in request.endpoint %}{{ active }}{% endif %} text-red-700 font-bold border border-red-200 bg-red-50/50">
-        <i class="fas fa-hand-holding-heart"></i> <span>Comodati</span>
+        class="{{ base }} {% if 'prestiti' in request.endpoint %}{{ active }}{% endif %} text-red-700 border border-red-400 bg-red-100/30">
+        <i class="fas fa-hand-holding-heart text-base"></i> <span class="hidden xl:block 2xl:inline">Comodati</span>
       </a>
       {% endif %}
 
       <a href="{{ url_for('utenti_view') }}"
         class="{{ base }} {% if 'utenti' in request.endpoint %}{{ active }}{% endif %}">
-        <i class="fas fa-users"></i> <span>Utenti</span>
+        <i class="fas fa-users text-base"></i> <span class="hidden xl:block 2xl:inline">Utenti</span>
       </a>
 
-      {% if session.get("ruolo") == "Amministratore" %}
-      <a href="{{ url_for('visualizza_tutti_i_log') }}"
-        class="{{ base }} {% if request.endpoint=='visualizza_tutti_i_log' %}{{ active }}{% endif %}">
-        <i class="fas fa-history"></i> <span>Attività</span>
+      <a href="{{ url_for('messaggi') }}"
+        class="{{ base }} {% if 'messaggi' in request.endpoint %}{{ active }}{% endif %}">
+        <i class="fas fa-envelope text-base"></i> <span class="hidden xl:block 2xl:inline">Messaggi</span>
       </a>
-      {% endif %}
 
-      {# Profilo Utente con Icona Dinamica #}
-      <div class="flex items-center gap-2 px-3 py-2 bg-white/50 rounded-xl border border-yellow-400 ml-4">
+      {# PROFILO UTENTE SMART #}
+      <div
+        class="flex items-center gap-2 px-2 py-1 bg-white/50 rounded-lg border border-yellow-500 ml-2 shrink-0 group">
         {% if session.get("ruolo") == "Amministratore" %}
-        <i class="fas fa-user-shield text-red-600"></i>
+        <i class="fas fa-user-shield text-red-600 text-lg" title="Admin"></i>
         {% elif session.get("ruolo") == "Manager" %}
-        <i class="fas fa-user-tie text-blue-700"></i>
+        <i class="fas fa-user-tie text-blue-700 text-lg" title="Manager"></i>
         {% else %}
-        <i class="fas fa-user text-gray-600"></i>
+        <i class="fas fa-user text-gray-600 text-lg" title="Utente"></i>
         {% endif %}
-        <span class="text-xs font-bold uppercase">{{ session.get("username") }}</span>
+        <div class="flex flex-col leading-none hidden 2xl:flex">
+          <span class="text-[10px] font-black uppercase text-gray-700">{{ session.get("username") }}</span>
+          <span class="text-[8px] font-bold text-gray-500 uppercase">{{ session.get("ruolo") }}</span>
+        </div>
       </div>
 
       <a href="{{ url_for('logout') }}"
-        class="ml-2 flex items-center gap-2 px-3 py-2 bg-gray-700 text-white rounded-xl hover:bg-red-600 transition-colors">
-        <i class="fas fa-sign-out-alt"></i> <span>Esci</span>
+        class="ml-1 p-2 bg-gray-800 text-white rounded-lg hover:bg-red-600 transition-all shrink-0 shadow-sm"
+        title="Esci">
+        <i class="fas fa-sign-out-alt"></i>
       </a>
     </nav>
+
+    {# Bottone Menu Mobile (visibile sotto i 1024px) #}
+    <button id="menu-btn"
+      class="lg:hidden p-2 bg-white/20 hover:bg-yellow-400 rounded-lg transition-all border border-yellow-500/30">
+      <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
   </div>
 </header>
 
@@ -100,20 +94,20 @@
 {# 3. MENU MOBILE #}
 <div id="mobile-menu"
   class="fixed top-0 right-0 h-full w-72 bg-gray-900 text-white transform translate-x-full transition-transform duration-300 ease-in-out z-50 p-6 shadow-2xl overflow-y-auto">
-  
+
   <div class="flex items-center justify-between mb-8 border-b border-gray-700 pb-4">
     <div class="flex flex-col">
       <span class="text-xl font-bold text-yellow-300">Menu</span>
-      
+
       {# INFO UTENTE LOGGATO CON ICONA DINAMICA #}
       <div class="flex items-center gap-2 mt-2">
         <div class="p-1.5 rounded-lg bg-gray-800 border border-gray-700">
           {% if session.get("ruolo") == "Amministratore" %}
-            <i class="fas fa-user-shield text-red-500"></i>
+          <i class="fas fa-user-shield text-red-500"></i>
           {% elif session.get("ruolo") == "Manager" %}
-            <i class="fas fa-user-tie text-blue-400"></i>
+          <i class="fas fa-user-tie text-blue-400"></i>
           {% else %}
-            <i class="fas fa-user text-green-400"></i>
+          <i class="fas fa-user text-green-400"></i>
           {% endif %}
         </div>
         <div class="flex flex-col">
@@ -132,12 +126,17 @@
 
   <nav class="flex flex-col gap-4">
     {# Link esistenti... (Dashboard, Prodotti, ecc.) #}
-    {{ mobile_link(url_for('dashboard'), 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 'Dashboard', request.endpoint=='dashboard') }}
-    
+    {{ mobile_link(url_for('dashboard'), 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0
+    012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0
+    01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 'Dashboard',
+    request.endpoint=='dashboard') }}
+
     {# Restante parte della navigazione ... #}
     {{ mobile_link(url_for('prodotti_view'), 'M20 7H4v10h16V7z', 'Prodotti', 'prodotti' in request.endpoint) }}
-    {{ mobile_link(url_for('categorie_view'), 'M3 7h18M3 12h18M3 17h18', 'Categorie', 'categorie' in request.endpoint) }}
-    {{ mobile_link(url_for('movimenti_view'), 'M7 16l-4-4 4-4m10 8l4-4-4-4', 'Movimenti', 'movimenti' in request.endpoint) }}
+    {{ mobile_link(url_for('categorie_view'), 'M3 7h18M3 12h18M3 17h18', 'Categorie', 'categorie' in request.endpoint)
+    }}
+    {{ mobile_link(url_for('movimenti_view'), 'M7 16l-4-4 4-4m10 8l4-4-4-4', 'Movimenti', 'movimenti' in
+    request.endpoint) }}
     {{ mobile_link(url_for('lotti_view'), 'M20 7l-8-4-8 4v10l8 4 8-4V7z', 'Lotti', 'lotti' in request.endpoint) }}
 
     {# Comodati - Solo Admin #}
@@ -149,10 +148,12 @@
     </a>
     {% endif %}
 
-    {{ mobile_link(url_for('utenti_view'), 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 'Utenti', 'utenti' in request.endpoint) }}
+    {{ mobile_link(url_for('utenti_view'), 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0
+    00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 'Utenti', 'utenti' in request.endpoint) }}
 
     {% if session.get("ruolo") in ["Amministratore","Manager"] %}
-    {{ mobile_link(url_for('messaggi'), 'M8 10h8M8 14h6m-6 6l-4 4V4a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H8z', 'Messaggi', 'messaggi' in request.endpoint) }}
+    {{ mobile_link(url_for('messaggi'), 'M8 10h8M8 14h6m-6 6l-4 4V4a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H8z',
+    'Messaggi', 'messaggi' in request.endpoint) }}
     {% endif %}
 
     <div class="mt-6 pt-6 border-t border-gray-700">
