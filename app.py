@@ -15,6 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from flask import abort
+from datetime import datetime
 
 from datetime import date
 from flask import request
@@ -535,19 +536,30 @@ def chat_privata(dest_id):
     user_id = session["user_id"]
 
     if request.method == "POST":
-        contenuto = request.form.get("contenuto")
+        contenuto = request.form.get("contenuto", "").strip()
         if contenuto:
             cur.execute("""
                 INSERT INTO messaggi (mittente_id, destinatario_id, contenuto)
                 VALUES (%s, %s, %s)
             """, (user_id, dest_id, contenuto))
             db.commit()
+            db.close()
+            flash("Messaggio inviato!", "success")
+            return redirect(url_for('chat_privata', dest_id=dest_id))
+        else:
+            flash("Il messaggio non può essere vuoto", "warning")
+            return redirect(url_for('chat_privata', dest_id=dest_id))
 
-    # info destinatario
+    # Info destinatario
     cur.execute("SELECT username FROM utenti WHERE id=%s", (dest_id,))
     destinatario = cur.fetchone()
 
-    # messaggi SOLO tra voi due
+    if not destinatario:
+        db.close()
+        flash("Utente non trovato", "danger")
+        return redirect(url_for('messaggi'))
+
+    # Messaggi tra i due utenti
     cur.execute("""
         SELECT m.contenuto, m.data_creazione,
                mittente.username, destinatario.username
@@ -558,10 +570,9 @@ def chat_privata(dest_id):
            OR (m.mittente_id=%s AND m.destinatario_id=%s)
         ORDER BY m.data_creazione
     """, (user_id, dest_id, dest_id, user_id))
-
     messaggi = cur.fetchall()
 
-    # lista utenti (sidebar)
+    # Sidebar utenti
     cur.execute("""
         SELECT u.id, u.username
         FROM utenti u
@@ -573,15 +584,7 @@ def chat_privata(dest_id):
     utenti = cur.fetchall()
 
     db.close()
-
-    return render_template(
-        "chat_privata.html",
-        utenti=utenti,
-        messaggi=messaggi,
-        destinatario=destinatario,
-        dest_id=dest_id
-    )
-
+    return render_template("chat_privata.html", utenti=utenti, messaggi=messaggi, destinatario=destinatario, dest_id=dest_id)
 
 @app.route("/broadcast", methods=["POST"])
 @login_required
@@ -1054,17 +1057,44 @@ def modifica_prodotto(prodotto_id):
     )
 
 # -------- ELIMINA PRODOTTO --------
-@app.route("/prodotti/elimina/<int:prodotto_id>")
-@ruolo_required("Amministratore", "Manager")
+@app.route("/prodotti/elimina/<int:prodotto_id>", methods=["POST"]) # Aggiunto methods
 @login_required
+@ruolo_required("Amministratore")
 def elimina_prodotto(prodotto_id):
     db = get_db()
     cur = db.cursor()
-    # Elimina il prodotto dal database
-    cur.execute("DELETE FROM prodotti WHERE id = %s", (prodotto_id,))
-    db.commit()
-    db.close()
-    return redirect(url_for("prodotti_view"))
+    try:
+        # Recuperiamo il nome per il log prima di cancellare
+        cur.execute("SELECT nome FROM prodotti WHERE id = %s", (prodotto_id,))
+        prodotto = cur.fetchone()
+        
+        if not prodotto:
+            return {"status": "error", "message": "Prodotto non trovato"}, 404
+
+        # 1. Eliminiamo prima i lotti e i movimenti collegati (opzionale, valuta se vuoi farlo)
+        # Se preferisci bloccare l'eliminazione se ci sono lotti, salta queste due righe:
+        cur.execute("DELETE FROM movimenti WHERE prodotto_id = %s", (prodotto_id,))
+        cur.execute("DELETE FROM lotti WHERE prodotto_id = %s", (prodotto_id,))
+
+        # 2. Eliminiamo il prodotto
+        cur.execute("DELETE FROM prodotti WHERE id = %s", (prodotto_id,))
+        
+        # 3. Registriamo l'azione nel log
+        cur.execute("""
+            INSERT INTO log_operazioni (username, azione, dettaglio)
+            VALUES (%s, %s, %s)
+        """, (session.get('username'), 'ELIMINAZIONE', f"Eliminato prodotto {prodotto[0]} (ID: {prodotto_id})"))
+
+        db.commit()
+        return {"status": "success"}, 200
+
+    except Exception as e:
+        db.rollback()
+        # Se l'errore è dovuto a vincoli del database
+        return {"status": "error", "message": "Impossibile eliminare: il prodotto è collegato ad altre operazioni."}, 500
+    finally:
+        db.close()
+
 
 
 @app.route("/lista_spesa")
@@ -1704,6 +1734,99 @@ def visualizza_tutti_i_log():
     
     conn.close()
     return render_template("admin_full_logs.html", logs_pdf=logs_pdf, logs_op=logs_op)
+
+
+import os
+from werkzeug.utils import secure_filename
+from datetime import datetime
+
+# Configurazione cartella upload
+app.config['UPLOAD_FOLDER'] = 'static/uploads/documenti'
+UPLOAD_FOLDER = 'static/uploads/documenti'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route("/documenti", methods=["GET", "POST"])
+@login_required
+@ruolo_required("Amministratore")
+def documenti_view():
+    db = get_db()
+    cur = db.cursor()
+
+    if request.method == "POST":
+        titolo_base = request.form.get("titolo")
+        # Usiamo getlist invece di get
+        files = request.files.getlist("file_allegato") 
+        
+        caricati = 0
+        for file in files:
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
+                filename = timestamp + filename
+                
+                path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(path)
+
+                # Se carichi più file, puoi decidere di usare lo stesso titolo 
+                # o aggiungere il nome originale del file per distinguerli
+                titolo_finale = f"{titolo_base} ({file.filename})" if len(files) > 1 else titolo_base
+
+                cur.execute("""
+                    INSERT INTO documenti (titolo, nome_file, caricato_da)
+                    VALUES (%s, %s, %s)
+                """, (titolo_finale, filename, session.get("username")))
+                caricati += 1
+        
+        if caricati > 0:
+            db.commit()
+            flash(f"✅ {caricati} documenti archiviati con successo!", "success")
+        else:
+            flash("❌ Nessun file valido selezionato.", "error")
+            
+        return redirect(url_for('documenti_view'))
+
+    cur.execute("SELECT id, titolo, nome_file, caricato_da, data_caricamento FROM documenti ORDER BY data_caricamento DESC")
+    documenti = cur.fetchall()
+    db.close()
+    return render_template("documenti.html", documenti=documenti)
+
+
+@app.route("/documenti/elimina/<int:id>", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def elimina_documento(id):
+    db = get_db()
+    cur = db.cursor()
+    
+    try:
+        # 1. Recuperiamo il nome del file dal DB per poterlo cancellare anche dalla cartella
+        cur.execute("SELECT nome_file FROM documenti WHERE id = %s", (id,))
+        doc = cur.fetchone()
+        
+        if doc:
+            nome_file = doc[0]
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], nome_file)
+            
+            # 2. Eliminiamo il file fisico dal server (se esiste)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
+            # 3. Eliminiamo il record dal database
+            cur.execute("DELETE FROM documenti WHERE id = %s", (id,))
+            db.commit()
+            return "OK", 200
+        else:
+            return "Documento non trovato", 404
+            
+    except Exception as e:
+        print(f"Errore eliminazione: {e}")
+        return str(e), 500
+    finally:
+        db.close()
 
 
 @app.route("/prestiti/nuovo", methods=["GET", "POST"])

@@ -79,12 +79,19 @@
             <td class="px-6 py-3 flex items-center justify-between gap-2">
               <span>{{ prodotto[6] or "—" }}</span>
 
-              {% if session.get("ruolo") == "Amministratore" %}
-              <a href="{{ url_for('modifica_prodotto', prodotto_id=prodotto[0]) }}"
-                class="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 transition whitespace-nowrap">
-                ✏️ Modifica
-              </a>
-              {% endif %}
+              <div class="flex gap-2">
+                {% if session.get("ruolo") == "Amministratore" %}
+                <a href="{{ url_for('modifica_prodotto', prodotto_id=prodotto[0]) }}"
+                  class="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 transition shadow-sm">
+                  ✏️
+                </a>
+
+                <button onclick="eliminaProdotto('{{ prodotto[0] }}', '{{ prodotto[1]|e }}')"
+                  class="bg-red-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-700 transition shadow-sm">
+                  🗑️
+                </button>
+                {% endif %}
+              </div>
             </td>
 
             {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
@@ -187,6 +194,29 @@
         alert("Errore nel salvataggio della nota.");
       }
     }
+
+    async function eliminaProdotto(id, nome) {
+      if (confirm(`Sei sicuro di voler eliminare definitivamente il prodotto: "${nome}"?`)) {
+        try {
+          const response = await fetch(`/prodotti/elimina/${id}`, {
+            method: "POST", // O DELETE, a seconda di come configuri la rotta Flask
+            headers: { "Content-Type": "application/json" }
+          });
+
+          if (response.ok) {
+            alert("Prodotto eliminato correttamente.");
+            location.reload(); // Ricarica la tabella
+          } else {
+            const errorData = await response.json();
+            alert("Errore: " + (errorData.message || "Impossibile eliminare il prodotto."));
+          }
+        } catch (error) {
+          console.error("Errore nella richiesta:", error);
+          alert("Si è verificato un errore durante l'eliminazione.");
+        }
+      }
+    }
+
   </script>
 
 
