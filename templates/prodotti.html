@@ -41,6 +41,7 @@
     </div>
 
     <!-- Filtro scadenza -->
+    {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
     <div class="mb-4 flex flex-wrap gap-3 items-center">
       <label class="flex items-center gap-2 text-white cursor-pointer">
         <input type="checkbox" id="filterScadenza" class="w-4 h-4" onchange="filterScadenza()" />
@@ -48,6 +49,7 @@
       </label>
       <span class="text-sm text-red-300">(entro 30 giorni)</span>
     </div>
+    {% endif %}
 
     <!-- Tabella prodotti -->
     <div class="relative overflow-x-auto bg-white shadow rounded-lg border border-gray-200">
@@ -56,11 +58,18 @@
           <tr>
             <th class="px-6 py-3 font-semibold">ID</th>
             <th class="px-6 py-3 font-semibold">Nome</th>
+            <th class="px-6 py-3 font-semibold">Marca</th>
             <th class="px-6 py-3 font-semibold">Categoria</th>
             <th class="px-6 py-3 font-semibold">Misura</th>
+
+            {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
             <th class="px-6 py-3 font-semibold">Quantità</th>
+
             <th class="px-6 py-3 font-semibold">Scadenza</th>
+            {% endif %}
+
             <th class="px-6 py-3 font-semibold">Posizione</th>
+
             {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
             <th class="px-6 py-3 font-semibold text-center">Note</th>
             {% endif %}
@@ -71,21 +80,35 @@
           {% for prodotto in prodotti %}
           <tr class="hover:bg-gray-50">
             <td class="px-6 py-3">{{ prodotto[0] }}</td>
-            <td class="px-6 py-3">{{ prodotto[1] }}</td>
-            <td class="px-6 py-3">{{ prodotto[2] or "—" }}</td>
-            <td class="px-6 py-3">{{ prodotto[3] or "—" }}</td>
-            <td class="px-6 py-3">{{ prodotto[4] }}</td>
-            <td class="px-6 py-3">{{ prodotto[5] or "—" }}</td>
-            <td class="px-6 py-3 flex items-center justify-between gap-2">
-              <span>{{ prodotto[6] or "—" }}</span>
+            <td class="px-6 py-3">
+              {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+              {# Solo Admin e Manager vedono il link al dettaglio #}
+              <a href="{{ url_for('dettaglio_prodotto', prodotto_id=prodotto[0]) }}"
+                class="font-bold text-blue-700 hover:underline decoration-2">
+                {{ prodotto[1] }}
+              </a>
+              {% else %}
+              {# Gli utenti semplici vedono solo il nome senza link #}
+              <span class="font-bold text-gray-800">{{ prodotto[1] }}</span>
+              {% endif %}
+            </td>
 
+            <td class="px-6 py-3 italic text-gray-600">{{ prodotto[2] or "—" }}</td>
+            <td class="px-6 py-3">{{ prodotto[3] or "—" }}</td>
+            <td class="px-6 py-3">{{ prodotto[4] or "—" }}</td> {% if session.get("ruolo") in ["Amministratore",
+            "Manager"] %}
+            <td class="px-6 py-3 font-bold {{ 'text-red-600' if prodotto[5]|int <= 0 else '' }}">
+              {{ prodotto[5] }} </td>
+            <td class="px-6 py-3">{{ prodotto[6] or "—" }}</td> {% endif %}
+
+            <td class="px-6 py-3 flex items-center justify-between gap-2">
+              <span>{{ prodotto[7] or "—" }}</span>
               <div class="flex gap-2">
                 {% if session.get("ruolo") == "Amministratore" %}
                 <a href="{{ url_for('modifica_prodotto', prodotto_id=prodotto[0]) }}"
                   class="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 transition shadow-sm">
                   ✏️
                 </a>
-
                 <button onclick="eliminaProdotto('{{ prodotto[0] }}', '{{ prodotto[1]|e }}')"
                   class="bg-red-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-700 transition shadow-sm">
                   🗑️
@@ -96,14 +119,11 @@
 
             {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
             <td class="px-6 py-3 text-center">
-              {% if prodotto[7] %}
-              <button type="button"
+              {% if prodotto[8] %} <button type="button"
                 class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-600 btn-nota"
-                data-nota="{{ prodotto[7] if prodotto[7] is not none else '' }}" data-id="{{ prodotto[0] }}">
+                data-nota="{{ prodotto[8] }}" data-id="{{ prodotto[0] }}">
                 📄 Note
               </button>
-
-
               {% else %}
               <span class="text-gray-400">—</span>
               {% endif %}
@@ -113,7 +133,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="{% if session.get('ruolo') in ['Amministratore','Manager'] %}8{% else %}7{% endif %}"
+            <td colspan="{% if session.get('ruolo') in ['Amministratore','Manager'] %}9{% else %}6{% endif %}"
               class="px-6 py-4 text-center text-gray-500">
               Nessun prodotto disponibile.
             </td>
@@ -147,81 +167,134 @@
   <script>
     let currentProdottoId = null;
 
-    function showNote(note, prodottoId) {
-      currentProdottoId = prodottoId;
-      document.getElementById("noteContent").value = note || "";
-      document.getElementById("noteModal").classList.remove("hidden");
-      document.getElementById("noteModal").classList.add("flex");
+function applyFilters() {
+    const searchInput = document.getElementById("searchInput").value.toLowerCase();
+    const checkboxScadenza = document.getElementById("filterScadenza");
+    const isScadenzaChecked = checkboxScadenza ? checkboxScadenza.checked : false;
+
+    const table = document.querySelector("table");
+    const tbody = table.querySelector("tbody");
+    const tr = tbody.getElementsByTagName("tr");
+    
+    let righeVisibili = 0;
+
+    // Prepariamo le date
+    const oggi = new Date();
+    oggi.setHours(0, 0, 0, 0);
+    const limite = new Date();
+    limite.setDate(oggi.getDate() + 30);
+    limite.setHours(23, 59, 59, 999);
+
+    for (let i = 0; i < tr.length; i++) {
+        // Salta la riga del messaggio "Nessun risultato" se già presente
+        if (tr[i].id === "no-results-row") continue;
+
+        // 1. Filtro Testuale
+        const testoRiga = tr[i].innerText.toLowerCase();
+        const matchRicerca = testoRiga.includes(searchInput);
+
+        // 2. Filtro Scadenza
+        let matchScadenza = true;
+        if (isScadenzaChecked) {
+            const tdScadenza = tr[i].cells[6]; // Colonna Scadenza
+            if (tdScadenza) {
+                const dataTesto = tdScadenza.textContent.trim();
+                if (dataTesto === "—" || dataTesto === "") {
+                    matchScadenza = false;
+                } else {
+                    let parti = dataTesto.split(/[-/]/);
+                    let dataOggetto = (parti[0].length === 4) 
+                        ? new Date(parti[0], parti[1] - 1, parti[2]) 
+                        : new Date(parti[2], parti[1] - 1, parti[0]);
+
+                    matchScadenza = (!isNaN(dataOggetto.getTime()) && dataOggetto >= oggi && dataOggetto <= limite);
+                }
+            } else {
+                matchScadenza = false; 
+            }
+        }
+
+        // Mostra/Nascondi
+        if (matchRicerca && matchScadenza) {
+            tr[i].style.display = "";
+            righeVisibili++;
+        } else {
+            tr[i].style.display = "none";
+        }
     }
 
-    function closeNote() {
-      document.getElementById("noteModal").classList.add("hidden");
-      document.getElementById("noteModal").classList.remove("flex");
-      currentProdottoId = null;
+    // GESTIONE MESSAGGIO VUOTO
+    let noResultsRow = document.getElementById("no-results-row");
+    if (righeVisibili === 0) {
+        if (!noResultsRow) {
+            noResultsRow = document.createElement("tr");
+            noResultsRow.id = "no-results-row";
+            // Calcola dinamicamente il numero di colonne per il colspan
+            const colCount = table.querySelector("thead tr").cells.length;
+            noResultsRow.innerHTML = `
+                <td colspan="${colCount}" class="px-6 py-10 text-center">
+                    <div class="flex flex-col items-center justify-center text-gray-500">
+                        <span class="text-4xl mb-2">🔍</span>
+                        <p class="font-semibold text-lg">Nessun prodotto trovato</p>
+                        <p class="text-sm">Prova a cambiare i filtri o la ricerca.</p>
+                    </div>
+                </td>`;
+            tbody.appendChild(noResultsRow);
+        } else {
+            noResultsRow.style.display = "";
+        }
+    } else if (noResultsRow) {
+        noResultsRow.style.display = "none";
     }
+}
+// Colleghiamo le funzioni agli eventi
+function filterTable() { applyFilters(); }
+function filterScadenza() { applyFilters(); }
 
-    document.addEventListener('DOMContentLoaded', function () {
-      // Seleziona tutti i bottoni con la classe btn-nota
-      const bottoniNote = document.querySelectorAll('.btn-nota');
+// --- Gestione Note (Funzionante) ---
+function showNote(note, prodottoId) {
+    currentProdottoId = prodottoId;
+    document.getElementById("noteContent").value = note || "";
+    document.getElementById("noteModal").classList.remove("hidden");
+    document.getElementById("noteModal").classList.add("flex");
+}
 
-      bottoniNote.forEach(bottone => {
+function closeNote() {
+    document.getElementById("noteModal").classList.add("hidden");
+    document.getElementById("noteModal").classList.remove("flex");
+    currentProdottoId = null;
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const bottoniNote = document.querySelectorAll('.btn-nota');
+    bottoniNote.forEach(bottone => {
         bottone.addEventListener('click', function () {
-          // Recupera i dati dagli attributi data-
-          const nota = this.getAttribute('data-nota');
-          const id = this.getAttribute('data-id');
-
-          // Chiama la tua funzione originale
-          showNote(nota, id);
+            showNote(this.getAttribute('data-nota'), this.getAttribute('data-id'));
         });
-      });
     });
+});
 
-    async function saveNote() {
-      const note = document.getElementById("noteContent").value;
-      if (!currentProdottoId) return;
-
-      const response = await fetch(`/prodotti/note/${currentProdottoId}`, {
+async function saveNote() {
+    const note = document.getElementById("noteContent").value;
+    if (!currentProdottoId) return;
+    const response = await fetch(`/prodotti/note/${currentProdottoId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note })
-      });
+    });
+    if (response.ok) { location.reload(); }
+}
 
-      if (response.ok) {
-        alert("Nota salvata!");
-        closeNote();
-        location.reload();
-      } else {
-        alert("Errore nel salvataggio della nota.");
-      }
+async function eliminaProdotto(id, nome) {
+    if (confirm(`Eliminare definitivamente: ${nome}?`)) {
+        const response = await fetch(`/prodotti/elimina/${id}`, { method: "POST" });
+        if (response.ok) { location.reload(); }
     }
-
-    async function eliminaProdotto(id, nome) {
-      if (confirm(`Sei sicuro di voler eliminare definitivamente il prodotto: "${nome}"?`)) {
-        try {
-          const response = await fetch(`/prodotti/elimina/${id}`, {
-            method: "POST", // O DELETE, a seconda di come configuri la rotta Flask
-            headers: { "Content-Type": "application/json" }
-          });
-
-          if (response.ok) {
-            alert("Prodotto eliminato correttamente.");
-            location.reload(); // Ricarica la tabella
-          } else {
-            const errorData = await response.json();
-            alert("Errore: " + (errorData.message || "Impossibile eliminare il prodotto."));
-          }
-        } catch (error) {
-          console.error("Errore nella richiesta:", error);
-          alert("Si è verificato un errore durante l'eliminazione.");
-        }
-      }
-    }
+}
 
   </script>
 
 
-
-  <script src="{{ url_for('static', filename='search.js') }}"></script>
 </body>
 
 </html>

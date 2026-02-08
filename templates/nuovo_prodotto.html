@@ -2,68 +2,72 @@
 {% block title %}Nuovo Articolo{% endblock %}
 
 {% block content %}
-<div class="flex justify-center items-center min-h-[70vh]">
+<div class="flex justify-center items-start pt-6 min-h-[80vh]">
 
-    <form method="POST" class="bg-white p-8 rounded-xl shadow-lg w-full max-w-lg space-y-4">
+    <form method="POST" class="bg-white p-6 rounded-xl shadow-lg w-full max-w-lg border border-gray-100">
 
-        <h2 class="text-2xl font-bold text-center text-indigo-600">
+        <h2 class="text-xl font-bold mb-5 text-indigo-600 flex items-center gap-2">
             ➕ Nuovo Articolo
         </h2>
 
-        <!-- Nome -->
-        <div>
-            <label class="block font-semibold">Nome Articolo *</label>
-            <input type="text" name="nome" required class="w-full border rounded-lg p-2">
+        <div class="space-y-3">
+            <div>
+                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Nome Articolo *</label>
+                <input type="text" name="nome" required
+                    class="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Marca</label>
+                    <input type="text" name="marca" placeholder="Es. Samsung"
+                        class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Categoria</label>
+                    <select name="categoria_id" class="w-full border rounded-lg p-2 text-sm">
+                        <option value="">—</option>
+                        {% for c in categorie %}
+                        <option value="{{ c[0] }}">{{ c[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Misura</label>
+                    <input type="text" name="misura" placeholder="pz, kg..."
+                        class="w-full border rounded-lg p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Q.tà Minima</label>
+                    <input type="number" name="quantita_minima" min="0" value="0"
+                        class="w-full border rounded-lg p-2 text-sm">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Posizione</label>
+                <input type="text" name="posizione" placeholder="Scaffale, Armadio..."
+                    class="w-full border rounded-lg p-2 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold uppercase text-gray-500 mb-1">Note</label>
+                <textarea name="note" rows="2" class="w-full border rounded-lg p-2 text-sm"
+                    placeholder="Info extra..."></textarea>
+            </div>
         </div>
 
-        <!-- Categoria -->
-        <div>
-            <label class="block font-semibold">Categoria</label>
-            <select name="categoria_id" class="w-full border rounded-lg p-2">
-                <option value="">— Seleziona —</option>
-                {% for c in categorie %}
-                <option value="{{ c[0] }}">{{ c[1] }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- Misura -->
-        <div>
-            <label class="block font-semibold">Misura</label>
-            <input type="text" name="misura" placeholder="es. pz, scatola, litro" class="w-full border rounded-lg p-2">
-        </div>
-
-        <!-- Posizione -->
-        <div>
-            <label class="block font-semibold">Posizione</label>
-            <input type="text" name="posizione" placeholder="Armadio A – Scaffale 3"
-                class="w-full border rounded-lg p-2">
-        </div>
-
-        <!-- Quantità minima -->
-        <div>
-            <label class="block font-semibold">Quantità minima</label>
-            <input type="number" name="quantita_minima" min="0" value="0" class="w-full border rounded-lg p-2">
-        </div>
-
-        <!-- Note -->
-        <div>
-            <label class="block font-semibold">Note</label>
-            <textarea name="note" rows="3" class="w-full border rounded-lg p-2"></textarea>
-        </div>
-
-        <!-- Pulsanti -->
-        <div class="flex gap-3 pt-4">
-            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                💾 Salva
+        <div class="flex gap-3 pt-5 mt-2 border-t">
+            <button type="submit"
+                class="flex-1 bg-green-600 text-white py-2 rounded-lg font-bold hover:bg-green-700 transition">
+                Salva
             </button>
-
-            <a href="{{ url_for('prodotti_view') }}" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300">
+            <a href="{{ url_for('prodotti_view') }}"
+                class="flex-1 text-center py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
                 Annulla
             </a>
         </div>
 
     </form>
-
 </div>
 {% endblock %}

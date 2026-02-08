@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dettaglio Prodotto - {{ prodotto[1] }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    {% include "_header.html" %}
+
+    <main class="max-w-4xl mx-auto mt-8 p-4">
+        <a href="{{ url_for('prodotti_view') }}" class="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-6 transition">
+            <i class="fas fa-arrow-left"></i> Torna all'elenco
+        </a>
+
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+            <div class="bg-yellow-400 p-6">
+                <h1 class="text-3xl font-black text-gray-900 uppercase tracking-tight">{{ prodotto[1] }}</h1>
+                {# Mostriamo la Marca sotto il titolo #}
+                <p class="text-yellow-900 font-bold italic">{{ prodotto[2] or "Marca non specificata" }}</p>
+                <p class="text-yellow-900 font-bold opacity-80 uppercase text-sm">ID Prodotto: #{{ prodotto[0] }}</p>
+            </div>
+
+            <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Categoria</label>
+                        <p class="text-lg font-bold text-gray-800">{{ prodotto[3] or "Nessuna" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Misura / Formato</label>
+                        <p class="text-lg font-bold text-gray-800">{{ prodotto[4] or "—" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Posizione in Magazzino</label>
+                        <p class="text-lg font-bold text-blue-600"><i class="fas fa-map-marker-alt"></i> {{ prodotto[7] or "Non definita" }}</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6">
+                    {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+                    <div>
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Giacenza Attuale</label>
+                        {# AGGIORNATO INDICE A 5 E AGGIUNTO |int PER EVITARE L'ERRORE #}
+                        <p class="text-4xl font-black {{ 'text-red-600' if prodotto[5]|int <= 0 else 'text-green-600' }}">
+                            {{ prodotto[5] }}
+                        </p>
+                    </div>
+                    {% else %}
+                    <div>
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Disponibilità</label>
+                        <p class="text-xl font-bold">
+                            {% if prodotto[5]|int > 0 %}
+                                <span class="text-green-600"><i class="fas fa-check-circle"></i> Disponibile</span>
+                            {% else %}
+                                <span class="text-red-600"><i class="fas fa-times-circle"></i> Esaurito</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Prossima Scadenza</label>
+                        <p class="text-lg font-bold text-gray-800">
+                            <i class="fas fa-calendar-alt text-gray-400"></i> {{ prodotto[6] or "Nessuna scadenza" }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-8 pb-8">
+                <div class="border-t border-gray-100 pt-6">
+                    <label class="text-xs font-black text-gray-400 uppercase tracking-widest">Note e Descrizione</label>
+                    <div class="mt-2 p-4 bg-yellow-50 border-l-4 border-yellow-400 italic text-gray-700">
+                        {{ prodotto[8] if prodotto[8] else "Nessuna nota aggiuntiva." }}
+                    </div>
+                </div>
+            </div>
+
+            {% if session.get("ruolo") == "Amministratore" %}
+            <div class="bg-gray-100 px-8 py-4 flex justify-end gap-3">
+                <a href="{{ url_for('modifica_prodotto', prodotto_id=prodotto[0]) }}" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-md">
+                    <i class="fas fa-edit"></i> Modifica
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 import psycopg2
 from config import *
@@ -215,40 +215,37 @@ def lotti_view():
     conn = get_db()
     cur = conn.cursor()
 
-    # 1. Recupero i dati dei lotti (il tuo codice originale)
+    # Aggiungiamo p.marca alla query
     cur.execute("""
         SELECT
             l.id,
             p.nome,
             l.quantita,
             l.data_scadenza,
-            p.posizione
+            p.posizione,
+            p.marca        -- <--- Colonna indice 5
         FROM lotti l
         JOIN prodotti p ON l.prodotto_id = p.id
         ORDER BY l.data_scadenza ASC
     """)
     lotti = cur.fetchall()
 
-    # 2. AGGIUNTA: Recupero gli anni dai movimenti per il menu PDF
-    # Usiamo DISTINCT per non avere doppioni e ORDER BY per l'anno più recente in alto
+    # Recupero anni per PDF (come prima)
     cur.execute("""
         SELECT DISTINCT EXTRACT(YEAR FROM data_movimento)::int as anno 
         FROM movimenti 
         ORDER BY anno DESC
     """)
     anni_report = [r[0] for r in cur.fetchall()]
-
-    # Ora posso chiudere la connessione
     conn.close()
 
     oggi = date.today()
     soglia_scadenza = oggi + timedelta(days=7)
 
-    # 3. Invio tutto al template, inclusa la nuova lista anni_report
     return render_template(
         "lotti.html",
         lotti=lotti,
-        anni_report=anni_report,  # <--- Passiamo i dati al template
+        anni_report=anni_report,
         oggi=oggi,
         soglia_scadenza=soglia_scadenza
     )
@@ -265,22 +262,19 @@ def carico_lotto():
         prodotto_id = int(request.form["prodotto_id"])
         quantita = int(request.form["quantita"])
         data_scadenza = request.form.get("data_scadenza")
+        marca = request.form.get("marca", "").strip() # <--- Nuovo campo marca
         
-        # 1. GESTIONE CODICE LOTTO (Prima della ricerca nel DB)
         codice_lotto = request.form.get("codice_lotto", "").strip()
         if not codice_lotto:
-            # Genera codice automatico: L-20260124-1530
             from datetime import datetime
             codice_lotto = datetime.now().strftime("L-%Y%m%d-%H%M")
 
-        if not data_scadenza: 
-            data_scadenza = None
+        data_scadenza = data_scadenza if data_scadenza else None
 
-        # Recupero nome prodotto per il log
         cur.execute("SELECT nome FROM prodotti WHERE id = %s", (prodotto_id,))
         nome_prodotto = cur.fetchone()[0]
 
-        # 2. CONTROLLO ESISTENZA (Ora con il codice_lotto già definito)
+        # CONTROLLO ESISTENZA (includiamo marca nella ricerca se vuoi unire lotti identici)
         cur.execute("""
             SELECT id FROM lotti 
             WHERE prodotto_id = %s 
@@ -290,40 +284,46 @@ def carico_lotto():
         lotto = cur.fetchone()
 
         if lotto:
-            # Aggiorna esistente
             cur.execute("UPDATE lotti SET quantita = quantita + %s WHERE id = %s", (quantita, lotto[0]))
             lotto_id = lotto[0]
         else:
-            # Crea nuovo
+            # Inserimento nuovo lotto (Aggiungi colonna marca se l'hai creata nel DB)
             cur.execute("""
                 INSERT INTO lotti (prodotto_id, quantita, data_scadenza, codice_lotto)
                 VALUES (%s, %s, %s, %s) RETURNING id
             """, (prodotto_id, quantita, data_scadenza, codice_lotto))
             lotto_id = cur.fetchone()[0]
 
-        # 3. AGGIORNA TOTALI E REGISTRA MOVIMENTO
+        # AGGIORNA TOTALI
         cur.execute("UPDATE prodotti SET quantita = quantita + %s WHERE id = %s", (quantita, prodotto_id))
         
+        # REGISTRA MOVIMENTO (includiamo info marca nel dettaglio se necessario)
         cur.execute("""
             INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, data_scadenza)
             VALUES (%s, %s, 'entrata', %s, %s)
         """, (prodotto_id, lotto_id, quantita, data_scadenza))
 
-        # 4. LOG OPERAZIONE (Chi ha fatto cosa)
+        # LOG OPERAZIONE con Marca
+        dettaglio_log = f"Caricati {quantita} pz di {nome_prodotto} (Lotto: {codice_lotto})"
+        if marca:
+            dettaglio_log += f" - Marca: {marca}"
+
         cur.execute("""
             INSERT INTO log_operazioni (username, azione, dettaglio)
             VALUES (%s, %s, %s)
-        """, (session.get('username'), 'CARICO', f"Caricati {quantita} pz di {nome_prodotto} (Lotto: {codice_lotto})"))
+        """, (session.get('username'), 'CARICO', dettaglio_log))
 
         conn.commit()
         conn.close()
-        flash(f"✅ Carico effettuato correttamente (Lotto: {codice_lotto})", "success")
+        flash(f"✅ Carico effettuato correttamente", "success")
         return redirect(url_for("lotti_view"))
 
-    cur.execute("SELECT id, nome FROM prodotti ORDER BY nome")
+    # Recuperiamo anche la MARCA dai prodotti per i suggerimenti del datalist
+    cur.execute("SELECT id, nome, marca FROM prodotti ORDER BY nome")
     prodotti = cur.fetchall()
     conn.close()
     return render_template("carico_lotto.html", prodotti=prodotti)
+
 
 @app.route("/lotti/uscita", methods=["GET", "POST"])
 @login_required
@@ -333,21 +333,27 @@ def uscita_lotto():
     cur = conn.cursor()
 
     if request.method == "POST":
+        # Grazie al campo hidden nel template, riceviamo l'ID corretto
         prodotto_id = int(request.form["prodotto_id"])
         quantita_da_scaricare = int(request.form["quantita"])
+        marca_scarico = request.form.get("marca", "").strip()
 
         cur.execute("SELECT nome, quantita FROM prodotti WHERE id = %s", (prodotto_id,))
         prod_data = cur.fetchone()
-        nome_prodotto = prod_data[0]
-        qta_totale = prod_data[1]
+        if not prod_data:
+            flash("❌ Prodotto non trovato", "error")
+            return redirect(url_for("uscita_lotto"))
+            
+        nome_prodotto, qta_totale = prod_data
 
         if qta_totale < quantita_da_scaricare:
             conn.close()
-            flash("❌ Quantità insufficiente", "error")
+            flash(f"❌ Quantità insufficiente (Disp: {qta_totale})", "error")
             return redirect(url_for("uscita_lotto"))
 
+        # Logica FIFO (resta invariata, funziona benissimo con l'ID)
         cur.execute("""
-            SELECT id, quantita, data_scadenza, codice_lotto FROM lotti
+            SELECT id, quantita FROM lotti
             WHERE prodotto_id = %s AND quantita > 0
             AND (data_scadenza IS NULL OR data_scadenza >= CURRENT_DATE)
             ORDER BY data_scadenza ASC NULLS LAST
@@ -356,7 +362,7 @@ def uscita_lotto():
         lotti = cur.fetchall()
         restante = quantita_da_scaricare
 
-        for lotto_id, qta_lotto, data_sca, cod_lotto in lotti:
+        for lotto_id, qta_lotto in lotti:
             if restante <= 0: break
             mov_qta = qta_lotto if qta_lotto <= restante else restante
             
@@ -370,20 +376,22 @@ def uscita_lotto():
             flash("❌ Errore: lotti validi insufficienti", "error")
         else:
             cur.execute("UPDATE prodotti SET quantita = quantita - %s WHERE id = %s", (quantita_da_scaricare, prodotto_id))
-            # LOG OPERAZIONE (Tracciabilità)
-            cur.execute("""
-                INSERT INTO log_operazioni (username, azione, dettaglio)
-                VALUES (%s, %s, %s)
-            """, (session.get('username'), 'SCARICO', f"Scaricati {quantita_da_scaricare} pz di {nome_prodotto}"))
+            
+            dettaglio_log = f"Scaricati {quantita_da_scaricare} pz di {nome_prodotto}"
+            if marca_scarico: dettaglio_log += f" (Marca rif: {marca_scarico})"
+            
+            cur.execute("INSERT INTO log_operazioni (username, azione, dettaglio) VALUES (%s, 'SCARICO', %s)", 
+                       (session.get('username'), dettaglio_log))
             conn.commit()
             flash("✅ Scarico effettuato", "success")
 
-        cur.execute("DELETE FROM lotti WHERE quantita = 0")
+        cur.execute("DELETE FROM lotti WHERE quantita <= 0")
         conn.commit()
         conn.close()
         return redirect(url_for("lotti_view"))
 
-    cur.execute("SELECT id, nome, quantita FROM prodotti WHERE quantita > 0 ORDER BY nome")
+    # IMPORTANTE: Passiamo la marca alla SELECT per il datalist dei suggerimenti
+    cur.execute("SELECT id, nome, quantita, marca FROM prodotti WHERE quantita > 0 ORDER BY nome")
     prodotti = cur.fetchall()
     conn.close()
     return render_template("uscita_lotto.html", prodotti=prodotti)
@@ -453,13 +461,13 @@ def modifica_lotto(lotto_id):
     cur = conn.cursor()
 
     if request.method == "POST":
-        quantita = int(request.form["quantita"])
-        data_scadenza = request.form.get("data_scadenza")
+        # Usiamo .get() per sicurezza se i campi fossero vuoti
+        quantita = int(request.form.get("quantita", 0))
+        data_scadenza = request.form.get("data_scadenza") or None
 
         cur.execute("""
-            UPDATE lotti
-            SET quantita = %s,
-                data_scadenza = %s
+            UPDATE lotti 
+            SET quantita = %s, data_scadenza = %s 
             WHERE id = %s
         """, (quantita, data_scadenza, lotto_id))
 
@@ -468,9 +476,9 @@ def modifica_lotto(lotto_id):
         flash("✅ Lotto aggiornato correttamente", "success")
         return redirect(url_for("lotti_view"))
 
-    # GET → carica dati lotto
+    # GET → Recuperiamo anche la MARCA (p.marca è all'indice 4)
     cur.execute("""
-        SELECT l.id, p.nome, l.quantita, l.data_scadenza
+        SELECT l.id, p.nome, l.quantita, l.data_scadenza, p.marca
         FROM lotti l
         JOIN prodotti p ON l.prodotto_id = p.id
         WHERE l.id = %s
@@ -478,8 +486,11 @@ def modifica_lotto(lotto_id):
     lotto = cur.fetchone()
     conn.close()
 
-    return render_template("modifica_lotto.html", lotto=lotto)
+    if not lotto:
+        flash("❌ Lotto non trovato", "danger")
+        return redirect(url_for("lotti_view"))
 
+    return render_template("modifica_lotto.html", lotto=lotto)
 
 
 @app.route("/lotti/<int:lotto_id>/elimina", methods=["POST", "GET"])
@@ -877,6 +888,7 @@ def dashboard():
         stato_db="Online" # Stato fisso a Online se la pagina carica
     )
 
+
 def controlla_scadenze():
     conn = get_db()
     cur = conn.cursor()
@@ -910,6 +922,7 @@ def prodotti_view():
         SELECT
             p.id,
             p.nome,
+            p.marca,           -- Aggiunta Marca
             c.nome AS categoria,
             p.misura,
             COALESCE(SUM(l.quantita), 0) AS quantita,
@@ -922,14 +935,11 @@ def prodotti_view():
     """
 
     if filtro == "scaduti":
-        sql += """
-            WHERE l.data_scadenza IS NOT NULL
-              AND l.data_scadenza < %s
-        """
+        sql += " WHERE l.data_scadenza < %s "
 
     sql += """
         GROUP BY
-            p.id, p.nome, c.nome, p.misura, p.posizione, p.note
+            p.id, p.nome, p.marca, c.nome, p.misura, p.posizione, p.note
         ORDER BY prossima_scadenza NULLS LAST
     """
 
@@ -941,13 +951,7 @@ def prodotti_view():
     prodotti = cur.fetchall()
     conn.close()
 
-    return render_template(
-        "prodotti.html",
-        prodotti=prodotti,
-        filtro_attivo=filtro,
-        oggi=oggi
-    )
-
+    return render_template("prodotti.html", prodotti=prodotti, filtro_attivo=filtro, oggi=oggi)
 
 @app.route("/prodotti/nuovo", methods=["GET", "POST"])
 @login_required
@@ -958,6 +962,7 @@ def nuovo_prodotto():
 
     if request.method == "POST":
         nome = request.form["nome"]
+        marca = request.form.get("marca")  # <-- Recupero marca
         categoria_id = request.form.get("categoria_id")
         misura = request.form.get("misura")
         posizione = request.form.get("posizione")
@@ -967,6 +972,7 @@ def nuovo_prodotto():
         cur.execute("""
             INSERT INTO prodotti (
                 nome,
+                marca,
                 categoria_id,
                 misura,
                 posizione,
@@ -975,9 +981,10 @@ def nuovo_prodotto():
                 note,
                 attivo
             )
-            VALUES (%s, %s, %s, %s, 0, %s, %s, TRUE)
+            VALUES (%s, %s, %s, %s, %s, 0, %s, %s, TRUE)
         """, (
             nome,
+            marca,        # <-- Aggiunto ai parametri
             categoria_id,
             misura,
             posizione,
@@ -999,6 +1006,34 @@ def nuovo_prodotto():
     return render_template("nuovo_prodotto.html", categorie=categorie)
 
 
+@app.route("/prodotto/<int:prodotto_id>")
+@login_required
+@ruolo_required("Amministratore", "Manager")
+def dettaglio_prodotto(prodotto_id):
+    conn = get_db()
+    cur = conn.cursor()
+    # Usiamo una JOIN per prendere il nome della categoria e i dati aggregati dei lotti
+    cur.execute("""
+        SELECT 
+            p.id, p.nome, p.marca, c.nome AS categoria, p.misura, 
+            COALESCE(SUM(l.quantita), 0) AS quantita, 
+            MIN(l.data_scadenza) AS scadenza, 
+            p.posizione, p.note 
+        FROM prodotti p
+        LEFT JOIN categorie c ON p.categoria_id = c.id
+        LEFT JOIN lotti l ON l.prodotto_id = p.id
+        WHERE p.id = %s
+        GROUP BY p.id, p.nome, p.marca, c.nome, p.misura, p.posizione, p.note
+    """, (prodotto_id,))
+    
+    prodotto = cur.fetchone()
+    conn.close()
+
+    if not prodotto:
+        return "Prodotto non trovato", 404
+
+    return render_template("dettaglio_prodotto.html", prodotto=prodotto)
+
 
 @app.route("/prodotti/modifica/<int:prodotto_id>", methods=["GET", "POST"])
 @login_required
@@ -1008,32 +1043,36 @@ def modifica_prodotto(prodotto_id):
 
     is_admin = session.get("ruolo") == "Amministratore"
 
-    if request.method == "POST" and not is_admin:
-        abort(403)
-
-    if request.method == "POST" and is_admin:
+    if request.method == "POST":
+        if not is_admin:
+            abort(403)
+        
+        # Recupero tutti i campi, inclusa la MARCA
         nome = request.form["nome"]
+        marca = request.form.get("marca") # <--- Aggiunto
         categoria_id = request.form["categoria_id"]
         misura = request.form["misura"]
         posizione = request.form["posizione"]
-        quantita_minima = request.form["quantita_minima"] # <--- Prelevo la soglia
+        quantita_minima = request.form["quantita_minima"]
 
         cur.execute("""
             UPDATE prodotti
-            SET nome=%s, categoria_id=%s, misura=%s, posizione=%s, quantita_minima=%s
+            SET nome=%s, marca=%s, categoria_id=%s, misura=%s, posizione=%s, quantita_minima=%s
             WHERE id=%s
-        """, (nome, categoria_id, misura, posizione, quantita_minima, prodotto_id))
+        """, (nome, marca, categoria_id, misura, posizione, quantita_minima, prodotto_id))
 
         db.commit()
+        flash(f"✅ Prodotto '{nome}' aggiornato con successo!", "success")
         return redirect(url_for("prodotti_view"))
 
-    # GET: prendo i dati includendo quantita_minima
+    # GET: Recupero dati inclusa MARCA e QUANTITA_MINIMA
     cur.execute("""
-        SELECT id, nome, categoria_id, misura, posizione, quantita_minima
+        SELECT id, nome, categoria_id, misura, posizione, quantita_minima, marca
         FROM prodotti
         WHERE id=%s
     """, (prodotto_id,))
     r = cur.fetchone()
+    
     if not r:
         abort(404)
 
@@ -1043,7 +1082,8 @@ def modifica_prodotto(prodotto_id):
         "categoria_id": r[2],
         "misura": r[3],
         "posizione": r[4],
-        "quantita_minima": r[5] # <--- Aggiunto al dizionario
+        "quantita_minima": r[5],
+        "marca": r[6] # <--- Indice 6 per la marca
     }
 
     cur.execute("SELECT id, nome FROM categorie ORDER BY nome")
@@ -1099,17 +1139,22 @@ def elimina_prodotto(prodotto_id):
 
 @app.route("/lista_spesa")
 @login_required
-@ruolo_required("Amministratore", "Manager")
 def lista_spesa():
+    # Recupera il ruolo, pulisce spazi e rende la prima lettera maiuscola
+    ruolo_attuale = str(session.get("ruolo", "")).strip().capitalize()
+    
+    if ruolo_attuale != "Amministratore":
+        flash("⛔ Accesso negato: Solo l'Amministratore può vedere la lista della spesa.", "danger")
+        return redirect(url_for("dashboard")) # Lo rispedisce in home
+
     db = get_db()
     cur = db.cursor()
-    
-    # Cerchiamo i prodotti sotto soglia (escludendo quelli con minima a 0 se preferisci)
     cur.execute("""
         SELECT id, nome, quantita, quantita_minima, posizione
         FROM prodotti
         WHERE quantita <= quantita_minima 
           AND attivo = TRUE
+          AND quantita_minima > 0
         ORDER BY posizione ASC
     """)
     prodotti_bassi = cur.fetchall()
@@ -1694,6 +1739,125 @@ def visualizza_log():
         return f"Errore durante il caricamento dei log: {str(e)}", 500
 
 
+@app.route("/documenti/log_stampa", methods=["POST"])
+@login_required
+def log_stampa():
+    data = request.json
+    titolo = data.get('titolo')
+    nome_file = data.get('file')
+    azione_ricevuta = data.get('azione', 'VISUALIZZAZIONE') # Prende l'azione dal JS
+    utente = session.get("username", "Utente Ignoto")
+
+    try:
+        db = get_db()
+        cur = db.cursor()
+        
+        cur.execute("""
+            INSERT INTO log_documenti (utente, azione, titolo_documento, data_azione, dettagli)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            utente, 
+            azione_ricevuta, # Inserisce "ANTEPRIMA" o "DOWNLOAD"
+            titolo, 
+            datetime.now(), 
+            f"File: {nome_file}"
+        ))
+        
+        db.commit()
+        db.close()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        print(f"Errore log: {e}")
+        return jsonify({"status": "error"}), 500
+
+
+
+@app.route("/documenti/elimina_gruppo", methods=['POST'])
+@login_required
+@ruolo_required("Amministratore")
+def elimina_gruppo():
+    titolo = request.form.get("titolo")
+    data_caricamento = request.form.get("data") # ISO string dal JS
+    utente = session.get("username", "Utente Ignoto")
+
+    try:
+        db = get_db()
+        cur = db.cursor()
+        
+        # 1. Eliminiamo i documenti dal database
+        cur.execute("DELETE FROM documenti WHERE titolo = %s AND data_caricamento = %s", (titolo, data_caricamento))
+        
+        # 2. Registriamo l'azione nel LOG
+        cur.execute("""
+            INSERT INTO log_documenti (utente, azione, titolo_documento, data_azione, dettagli)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            utente, 
+            "ELIMINAZIONE", 
+            titolo, 
+            datetime.now(), 
+            f"Rimosso gruppo documenti del {data_caricamento}"
+        ))
+        
+        db.commit()
+        db.close()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        print(f"Errore durante l'eliminazione: {e}")
+        return jsonify({"status": "error"}), 500
+
+
+from flask import make_response
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from io import BytesIO
+
+@app.route("/admin/esporta_log_archivio")
+@login_required
+@ruolo_required("Amministratore")
+def esporta_log_archivio():
+    conn = get_db()
+    cur = conn.cursor()
+    # Recuperiamo i log dell'archivio
+    cur.execute("SELECT data_azione, utente, azione, titolo_documento FROM log_documenti ORDER BY data_azione DESC")
+    logs = cur.fetchall()
+    conn.close()
+
+    # Generazione PDF
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(100, 800, "Registro Attività Archivio Documentale")
+    
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(50, 770, "Data")
+    p.drawString(150, 770, "Utente")
+    p.drawString(250, 770, "Azione")
+    p.drawString(350, 770, "Documento")
+    p.line(50, 765, 550, 765)
+
+    p.setFont("Helvetica", 9)
+    y = 750
+    for log in logs:
+        if y < 50: # Salto pagina se finisce lo spazio
+            p.showPage()
+            y = 800
+        
+        data_str = log[0].strftime('%d/%m/%Y %H:%M') if log[0] else "N.D."
+        p.drawString(50, y, data_str)
+        p.drawString(150, y, str(log[1]))
+        p.drawString(250, y, str(log[2]))
+        p.drawString(350, y, str(log[3])[:40]) # Tronca i titoli lunghi
+        y -= 20
+
+    p.save()
+    buffer.seek(0)
+    
+    response = make_response(buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = 'attachment; filename=log_archivio.pdf'
+    return response
+
 @app.route("/admin/audit-operazioni")
 @login_required
 @ruolo_required("Amministratore")
@@ -1720,20 +1884,37 @@ def visualizza_tutti_i_log():
     cur = conn.cursor()
     
     # 1. Log dei Download PDF
-    cur.execute("""
-    SELECT username, tipo_report, anno_filtro, data_download 
-    FROM log_download 
-    ORDER BY data_download DESC 
-    LIMIT 50
-""")
+    cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC LIMIT 50")
     logs_pdf = cur.fetchall()
     
-    # 2. Log delle Operazioni (Carichi/Scarichi)
+    # 2. Log delle Operazioni
     cur.execute("SELECT username, azione, dettaglio, data_operazione FROM log_operazioni ORDER BY data_operazione DESC LIMIT 50")
     logs_op = cur.fetchall()
     
+    # 3. Log Archivio Riservato (Azioni admin)
+    cur.execute("SELECT utente, azione, titolo_documento, data_azione, dettagli FROM log_documenti ORDER BY data_azione DESC LIMIT 50")
+    logs_doc = cur.fetchall()
+
+    # 4. DATI ARCHIVIO (Per visualizzare la tabella documenti e caricare nuovi file)
+    cur.execute("""
+        SELECT 
+            titolo, 
+            data_caricamento, 
+            caricato_da, 
+            JSON_AGG(nome_file) as lista_file,
+            categoria
+        FROM documenti 
+        GROUP BY titolo, data_caricamento, caricato_da, categoria 
+        ORDER BY data_caricamento DESC
+    """)
+    documenti = cur.fetchall()
+    
     conn.close()
-    return render_template("admin_full_logs.html", logs_pdf=logs_pdf, logs_op=logs_op)
+    return render_template("admin_full_logs.html", 
+                           logs_pdf=logs_pdf, 
+                           logs_op=logs_op, 
+                           logs_doc=logs_doc,
+                           documenti=documenti) # Fondamentale per la Tab Documenti
 
 
 import os
@@ -1757,76 +1938,80 @@ def documenti_view():
     cur = db.cursor()
 
     if request.method == "POST":
-        titolo_base = request.form.get("titolo")
-        # Usiamo getlist invece di get
-        files = request.files.getlist("file_allegato") 
-        
-        caricati = 0
-        for file in files:
-            if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_")
-                filename = timestamp + filename
-                
-                path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(path)
-
-                # Se carichi più file, puoi decidere di usare lo stesso titolo 
-                # o aggiungere il nome originale del file per distinguerli
-                titolo_finale = f"{titolo_base} ({file.filename})" if len(files) > 1 else titolo_base
-
-                cur.execute("""
-                    INSERT INTO documenti (titolo, nome_file, caricato_da)
-                    VALUES (%s, %s, %s)
-                """, (titolo_finale, filename, session.get("username")))
-                caricati += 1
-        
-        if caricati > 0:
-            db.commit()
-            flash(f"✅ {caricati} documenti archiviati con successo!", "success")
-        else:
-            flash("❌ Nessun file valido selezionato.", "error")
+        try:
+            titolo_base = request.form.get("titolo")
+            categoria = request.form.get("categoria", "Generale")
+            files = request.files.getlist("file_allegato") 
             
-        return redirect(url_for('documenti_view'))
+            data_fissa = datetime.now()
+            timestamp_str = data_fissa.strftime("%Y%m%d_%H%M%S_")
+            
+            for file in files:
+                if file and allowed_file(file.filename):
+                    filename_originale = secure_filename(file.filename)
+                    nome_file_disco = timestamp_str + filename_originale
+                    file.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_file_disco))
 
-    cur.execute("SELECT id, titolo, nome_file, caricato_da, data_caricamento FROM documenti ORDER BY data_caricamento DESC")
-    documenti = cur.fetchall()
-    db.close()
-    return render_template("documenti.html", documenti=documenti)
+                    cur.execute("""
+                        INSERT INTO documenti (titolo, nome_file, caricato_da, data_caricamento, categoria)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (titolo_base, nome_file_disco, session.get("username"), data_fissa, categoria))
+            
+            # Registra l'azione nei log documenti
+            cur.execute("""
+                INSERT INTO log_documenti (utente, azione, titolo_documento, data_azione)
+                VALUES (%s, %s, %s, %s)
+            """, (session.get("username"), "CARICAMENTO", titolo_base, data_fissa))
+
+            db.commit()
+            # IMPORTANTE: Il JS si aspetta una risposta semplice, non un redirect
+            return "OK", 200 
+            
+        except Exception as e:
+            db.rollback()
+            print(f"Errore: {e}")
+            return str(e), 500
+        finally:
+            db.close()
+
+    # Se qualcuno accede a /documenti via GET, lo rimandiamo alla pagina principale dei registri
+    return redirect(url_for('visualizza_tutti_i_log'))
 
 
-@app.route("/documenti/elimina/<int:id>", methods=["POST"])
+
+@app.route("/documenti/elimina_gruppo", methods=["POST"])
 @login_required
 @ruolo_required("Amministratore")
-def elimina_documento(id):
+def elimina_gruppo_documenti():
+    titolo = request.form.get("titolo")
+    data_caricamento = request.form.get("data") # Ricevuta come stringa ISO
+    
     db = get_db()
     cur = db.cursor()
     
-    try:
-        # 1. Recuperiamo il nome del file dal DB per poterlo cancellare anche dalla cartella
-        cur.execute("SELECT nome_file FROM documenti WHERE id = %s", (id,))
-        doc = cur.fetchone()
-        
-        if doc:
-            nome_file = doc[0]
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], nome_file)
+    # 1. Recuperiamo i nomi dei file fisici per eliminarli dal disco
+    cur.execute("""
+        SELECT nome_file FROM documenti 
+        WHERE titolo = %s AND data_caricamento = %s
+    """, (titolo, data_caricamento))
+    
+    files = cur.fetchall()
+    
+    for f in files:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f[0])
+        if os.path.exists(file_path):
+            os.remove(file_path)
             
-            # 2. Eliminiamo il file fisico dal server (se esiste)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            
-            # 3. Eliminiamo il record dal database
-            cur.execute("DELETE FROM documenti WHERE id = %s", (id,))
-            db.commit()
-            return "OK", 200
-        else:
-            return "Documento non trovato", 404
-            
-    except Exception as e:
-        print(f"Errore eliminazione: {e}")
-        return str(e), 500
-    finally:
-        db.close()
+    # 2. Eliminiamo le voci dal database
+    cur.execute("""
+        DELETE FROM documenti 
+        WHERE titolo = %s AND data_caricamento = %s
+    """, (titolo, data_caricamento))
+    
+    db.commit()
+    db.close()
+    
+    return jsonify({"status": "success", "message": "Intero gruppo eliminato"})
 
 
 @app.route("/prestiti/nuovo", methods=["GET", "POST"])

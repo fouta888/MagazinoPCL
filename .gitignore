@@ -11,3 +11,14 @@ __pycache__/
 # OS
 Thumbs.db
 .DS_Store
+
+# --- AGGIUNTE PER IL TUO MAGAZZINO ---
+
+# Ignora tutti i file dentro la cartella uploads
+static/uploads/*
+
+# Ma NON ignorare il file .gitkeep (così la cartella viene creata sul server)
+!static/uploads/.gitkeep
+
+# Ignora eventuali database SQLite locali se non vuoi caricarli
+*.db

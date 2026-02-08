@@ -11,16 +11,25 @@
 
         <div>
             <label class="font-semibold block mb-1 text-gray-700">Prodotto</label>
-            <select id="prodottoSelect" name="prodotto_id"
+            <input type="text" id="prodottoInput" list="prodottiList" 
+                placeholder="Scrivi il nome del prodotto..."
                 class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-                required>
-                <option value="" disabled selected>Seleziona un prodotto...</option>
+                required autocomplete="off">
+            <datalist id="prodottiList">
                 {% for p in prodotti %}
-                <option value="{{ p[0] }}" data-max="{{ p[2] }}">
-                    {{ p[1] }} (Disp: {{ p[2] }})
+                <option value="{{ p[1] }}" data-id="{{ p[0] }}" data-max="{{ p[2] }}">
+                    Disp: {{ p[2] }} | {{ p[3] or 'Nessuna marca' }}
                 </option>
                 {% endfor %}
-            </select>
+            </datalist>
+            <input type="hidden" id="prodotto_id" name="prodotto_id">
+        </div>
+
+        <div>
+            <label class="font-semibold block mb-1 text-gray-700 text-sm">Marca (opzionale)</label>
+            <input type="text" name="marca" 
+                class="w-full border border-gray-200 p-2.5 rounded-lg bg-gray-50 text-gray-600 focus:ring-2 focus:ring-gray-300 outline-none"
+                placeholder="Specifica marca se necessario">
         </div>
 
         <div>
@@ -39,40 +48,53 @@
             class="block text-center text-gray-700 mt-6 text-sm hover:text-gray-600 hover:underline">
             ← Torna alla lista lotti
         </a>
-
-        
     </form>
-
 </div>
 
 <script>
+    const prodottoInput = document.getElementById('prodottoInput');
+    const hiddenIdInput = document.getElementById('prodotto_id');
+    const datalist = document.getElementById('prodottiList');
+    const inputQta = document.getElementById('inputQuantita');
+
+    // Sincronizza l'ID quando l'utente seleziona o scrive un prodotto valido
+    prodottoInput.addEventListener('input', function() {
+        const val = this.value;
+        const options = datalist.options;
+        let foundId = "";
+        
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === val) {
+                foundId = options[i].getAttribute('data-id');
+                // Aggiorna anche il limite massimo per la quantità
+                inputQta.setAttribute('data-max', options[i].getAttribute('data-max'));
+                break;
+            }
+        }
+        hiddenIdInput.value = foundId;
+    });
+
     document.getElementById('formScarico').addEventListener('submit', function (e) {
-        const select = document.getElementById('prodottoSelect');
-        const inputQta = document.getElementById('inputQuantita');
+        // Se l'ID è vuoto, significa che il prodotto scritto non è tra quelli suggeriti
+        if (!hiddenIdInput.value) {
+            e.preventDefault();
+            alert("❌ Seleziona un prodotto valido dalla lista dei suggerimenti.");
+            prodottoInput.focus();
+            return;
+        }
 
-        // Recupera l'opzione selezionata
-        const selectedOption = select.options[select.selectedIndex];
-
-        if (!selectedOption.value) return; // Se non ha selezionato nulla, lascia al browser il controllo 'required'
-
-        const maxDisponibile = parseInt(selectedOption.getAttribute('data-max'));
+        const maxDisponibile = parseInt(inputQta.getAttribute('data-max'));
         const qtaRichiesta = parseInt(inputQta.value);
 
         if (qtaRichiesta > maxDisponibile) {
-            // BLOCCO L'INVIO
             e.preventDefault();
-
-            alert("❌ Errore: Quantità non disponibile!\n\n" +
-                "Hai inserito: " + qtaRichiesta + "\n" +
-                "Massimo disponibile: " + maxDisponibile);
-
+            alert("❌ Errore: Quantità non disponibile!\nMassimo disponibile: " + maxDisponibile);
             inputQta.classList.add('border-red-500', 'bg-red-50');
             inputQta.focus();
         }
     });
 
-    // Resetta lo stile rosso quando l'utente cambia quantità
-    document.getElementById('inputQuantita').addEventListener('input', function () {
+    inputQta.addEventListener('input', function () {
         this.classList.remove('border-red-500', 'bg-red-50');
     });
 </script>

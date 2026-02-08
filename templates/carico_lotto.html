@@ -1,39 +1,96 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="flex justify-center items-center min-h-[70vh]">
-  <form method="POST" class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md space-y-4">
+<div class="flex justify-center items-center min-h-[70vh] px-2">
+  <form id="formCarico" method="POST" class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md space-y-4 border border-gray-100">
 
-    <h2 class="text-xl font-bold text-center">➕ Aggiungi Lotto</h2>
+    <h2 class="text-xl font-bold text-center text-gray-800">➕ Aggiungi Lotto</h2>
 
-    <label class="block font-semibold">Prodotto</label>
-    <select name="prodotto_id" required class="w-full border rounded p-2">
-      {% for p in prodotti %}
-      <option value="{{ p[0] }}">{{ p[1] }}</option>
-      {% endfor %}
-    </select>
+    <div>
+      <label class="block font-semibold mb-1 text-gray-700">Prodotto</label>
+      <input type="text" id="prodottoInput" list="prodottiList" 
+        placeholder="Cerca prodotto per nome..."
+        class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-green-500 outline-none"
+        required autocomplete="off">
+      
+      <datalist id="prodottiList">
+        {% for p in prodotti %}
+        <option value="{{ p[1] }}" data-id="{{ p[0] }}">
+          {{ p[2] if p[2] else 'Nessuna marca' }}
+        </option>
+        {% endfor %}
+      </datalist>
+      
+      <input type="hidden" id="prodotto_id" name="prodotto_id">
+    </div>
 
-    <label class="block font-semibold">Quantità</label>
-    <input type="number" name="quantita" min="1" required class="w-full border rounded p-2">
+    <div>
+      <label class="block font-semibold mb-1 text-gray-700 text-sm">Marca (opzionale)</label>
+      <input type="text" name="marca" 
+        placeholder="Specifica la marca"
+        class="w-full border border-gray-200 rounded-lg p-2.5 bg-gray-50 text-gray-600 focus:ring-2 focus:ring-gray-300 outline-none">
+    </div>
 
-    <label class="block font-semibold text-blue-700">Codice Lotto (ID Univoco)</label>
-    <input type="text" name="codice_lotto" placeholder="Es: ABC-123 o lotto-2026-A"
-      class="w-full border-2 border-blue-100 rounded p-2 focus:border-blue-500 outline-none">
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block font-semibold mb-1 text-gray-700">Quantità</label>
+        <input type="number" name="quantita" min="1" required 
+          class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-green-500 outline-none">
+      </div>
+      <div>
+        <label class="block font-semibold mb-1 text-gray-700">Data scadenza</label>
+        <input type="date" name="data_scadenza" 
+          class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-green-500 outline-none">
+      </div>
+    </div>
 
-    <label class="block font-semibold">Data scadenza</label>
-    <input type="date" name="data_scadenza" class="w-full border rounded p-2">
+    <div>
+      <label class="block font-semibold text-blue-700 mb-1">Codice Lotto (ID Univoco)</label>
+      <input type="text" name="codice_lotto" placeholder="Es: ABC-123 o lotto-2026-A"
+        class="w-full border-2 border-blue-100 rounded-lg p-2.5 focus:border-blue-500 outline-none">
+    </div>
 
-    <button
-      class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold shadow-md transition-colors">
+    <button type="submit"
+      class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold shadow-md transition-all active:scale-95">
       💾 Carica Lotto
     </button>
 
     <a href="{{ url_for('lotti_view') }}"
-      class="block text-center text-gray-700 mt-6 text-sm hover:text-gray-600 hover:underline">
+      class="block text-center text-gray-600 mt-6 text-sm hover:text-gray-900 hover:underline">
       ← Torna alla lista lotti
     </a>
 
   </form>
 </div>
+
+<script>
+    const prodottoInput = document.getElementById('prodottoInput');
+    const hiddenIdInput = document.getElementById('prodotto_id');
+    const datalist = document.getElementById('prodottiList');
+
+    // Funzione per collegare il nome scritto all'ID reale
+    prodottoInput.addEventListener('input', function() {
+        const val = this.value;
+        const options = datalist.options;
+        let foundId = "";
+        
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === val) {
+                foundId = options[i].getAttribute('data-id');
+                break;
+            }
+        }
+        hiddenIdInput.value = foundId;
+    });
+
+    // Validazione prima dell'invio
+    document.getElementById('formCarico').addEventListener('submit', function (e) {
+        if (!hiddenIdInput.value) {
+            e.preventDefault();
+            alert("⚠️ Prodotto non riconosciuto. Seleziona un nome suggerito dalla lista.");
+            prodottoInput.focus();
+        }
+    });
+</script>
 
 {% endblock %}

@@ -1,25 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="max-w-4xl mx-auto p-6">
-  <h1 class="text-3xl font-bold mb-8 text-gray-800">Modifica Prodotto</h1>
+<div class="max-w-4xl mx-auto p-4">
+  <h1 class="text-3xl font-bold mb-4 text-yellow-400">Modifica Prodotto</h1>
 
   <form method="POST" class="bg-white shadow-md rounded-2xl p-6 space-y-6">
 
-    <!-- Grid 2 colonne su md -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
       <div class="flex flex-col">
-        <label class="mb-2 font-semibold text-gray-700">Nome</label>
+        <label class="mb-2 font-semibold text-gray-700">Nome Prodotto</label>
         <input type="text" name="nome" value="{{ prodotto.nome }}"
-          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition disabled:bg-gray-100 disabled:text-gray-500"
+          {% if not is_admin %}disabled{% endif %} required>
+      </div>
+
+      <div class="flex flex-col">
+        <label class="mb-2 font-semibold text-gray-700">Marca</label>
+        <input type="text" name="marca" value="{{ prodotto.marca if prodotto.marca else '' }}"
+          placeholder="Es: Barilla, Mulino Bianco..."
+          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition disabled:bg-gray-100"
           {% if not is_admin %}disabled{% endif %}>
       </div>
 
       <div class="flex flex-col">
         <label class="mb-2 font-semibold text-gray-700">Categoria</label>
         <select name="categoria_id"
-          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition disabled:bg-gray-100"
           {% if not is_admin %}disabled{% endif %}>
           {% for c in categorie %}
           <option value="{{ c[0] }}" {% if c[0]==prodotto.categoria_id %}selected{% endif %}>
@@ -30,44 +37,45 @@
       </div>
 
       <div class="flex flex-col">
-        <label class="mb-2 font-semibold text-gray-700">Misura</label>
-        <input type="text" name="misura" value="{{ prodotto.misura }}"
-          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+        <label class="mb-2 font-semibold text-gray-700">Unità di Misura</label>
+        <input type="text" name="misura" value="{{ prodotto.misura }}" placeholder="Es: kg, pezzi, litri..."
+          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition disabled:bg-gray-100"
           {% if not is_admin %}disabled{% endif %}>
       </div>
 
       <div class="flex flex-col">
-        <label class="mb-2 font-semibold text-gray-700">Posizione</label>
+        <label class="mb-2 font-semibold text-gray-700">Posizione in Magazzino</label>
         <input type="text" name="posizione" value="{{ prodotto.posizione }}"
-          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
+          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition disabled:bg-gray-100"
           {% if not is_admin %}disabled{% endif %}>
       </div>
 
       <div class="flex flex-col">
-        <label class="mb-2 font-semibold text-gray-700">Quantità Minima (Soglia)</label>
+        <label class="mb-2 font-semibold text-amber-700">Quantità Minima (Soglia Spesa)</label>
         <input type="number" name="quantita_minima" value="{{ prodotto.quantita_minima }}"
-          class="border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-yellow-400 focus:outline-none transition"
+          class="border border-amber-200 bg-amber-50 rounded-lg p-3 focus:ring-2 focus:ring-yellow-400 focus:outline-none transition disabled:opacity-50"
           {% if not is_admin %}disabled{% endif %} min="0">
-        <p class="text-[10px] text-gray-500 mt-1 italic">Sotto questa soglia il prodotto appare nella lista spesa.</p>
+        <p class="text-[10px] text-amber-600 mt-1 italic font-medium">Sotto questa scorta il prodotto apparirà nella
+          Lista della Spesa.</p>
       </div>
 
     </div>
 
-    <!-- Pulsanti -->
-    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
       {% if is_admin %}
       <button type="submit"
-        class="bg-green-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-green-700 transition">
-        Salva modifiche
+        class="w-full sm:w-auto bg-indigo-600 text-white font-bold px-10 py-3 rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-100">
+        💾 Salva modifiche
       </button>
       {% else %}
-      <p class="text-sm text-gray-500 italic">
-        Solo gli amministratori possono modificare i dati.
-      </p>
+      <div class="flex items-center gap-2 text-gray-400 italic">
+        <span>🔒</span>
+        <p class="text-sm">Sola lettura: contatta un Amministratore per modifiche.</p>
+      </div>
       {% endif %}
 
-      <a href="{{ url_for('prodotti_view') }}" class="text-gray-600 hover:text-gray-800 font-medium transition">
-        Torna indietro
+      <a href="{{ url_for('prodotti_view') }}" class="text-gray-500 hover:text-gray-800 font-medium transition py-2">
+        Annulla e torna indietro
       </a>
     </div>
 

@@ -2,45 +2,51 @@
 {% block content %}
 
 <div class="max-w-lg mx-auto">
-    <h1 class="text-2xl font-bold mb-6 text-gray-800">Modifica Lotto</h1>
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Modifica Lotto #{{ lotto[0] }}</h1>
+        <a href="{{ url_for('storico_lotto', lotto_id=lotto[0]) }}"
+            class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded hover:bg-gray-300 transition">
+            📜 Vedi Storico
+        </a>
+    </div>
 
     <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-        <div class="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
-            <p class="text-sm text-blue-600 font-semibold uppercase tracking-wider">Prodotto</p>
-            <p class="text-lg font-bold text-gray-800">{{ lotto[1] }}</p>
+        <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100 flex justify-between items-center">
+            <div>
+                <p class="text-sm text-blue-600 font-semibold uppercase tracking-wider">Prodotto</p>
+                <p class="text-lg font-bold text-gray-800">{{ lotto[1] }}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-blue-600 font-semibold uppercase tracking-wider">Marca</p>
+                <p class="text-md font-medium text-gray-700 italic">{{ lotto[4] if lotto[4] else 'Generica' }}</p>
+            </div>
         </div>
 
         <form method="POST" class="space-y-5">
             <div>
                 <label for="quantita" class="block font-semibold text-gray-700 mb-1">Quantità Attuale</label>
-                <input type="number" 
-                       name="quantita" 
-                       id="quantita" 
-                       value="{{ lotto[2] }}" 
-                       min="0" 
-                       class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none" 
-                       required>
-                <p class="text-xs text-gray-500 mt-1">Attenzione: la modifica manuale può sballare il totale prodotto.</p>
+                <input type="number" name="quantita" id="quantita" value="{{ lotto[2] }}" min="0"
+                    class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    required>
+                <p class="text-[11px] text-amber-600 mt-1 font-medium">⚠️ La modifica manuale non genera un movimento di
+                    registro.</p>
             </div>
 
             <div>
                 <label for="data_scadenza" class="block font-semibold text-gray-700 mb-1">Data di Scadenza</label>
-                <input type="date" 
-                       name="data_scadenza" 
-                       id="data_scadenza" 
-                       value="{{ lotto[3] if lotto[3] else '' }}" 
-                       class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <input type="date" name="data_scadenza" id="data_scadenza" value="{{ lotto[3] if lotto[3] else '' }}"
+                    class="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 <p class="text-xs text-gray-500 mt-1">Lascia vuoto se il prodotto non ha scadenza.</p>
             </div>
 
             <div class="flex items-center gap-4 pt-4">
-                <button type="submit" 
-                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
+                <button type="submit"
+                    class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
                     Salva Modifiche
                 </button>
-                
-                <a href="{{ url_for('lotti_view') }}" 
-                   class="flex-1 text-center bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
+
+                <a href="{{ url_for('lotti_view') }}"
+                    class="flex-1 text-center bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition">
                     Annulla
                 </a>
             </div>
@@ -49,11 +55,11 @@
 </div>
 
 <script>
-    // Semplice controllo: avvisa se si imposta la quantità a zero
-    document.querySelector('form').addEventListener('submit', function(e) {
+    // Avviso per quantità a zero
+    document.querySelector('form').addEventListener('submit', function (e) {
         const qta = document.getElementById('quantita').value;
         if (parseInt(qta) === 0) {
-            if (!confirm("Hai impostato la quantità a zero. Il lotto verrà rimosso o resterà vuoto. Confermi?")) {
+            if (!confirm("Hai impostato la quantità a zero. Il lotto rimarrà visibile ma vuoto. Confermi?")) {
                 e.preventDefault();
             }
         }

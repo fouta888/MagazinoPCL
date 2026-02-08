@@ -2,7 +2,7 @@
 <header class="bg-yellow-300 text-gray-900 p-2 sticky top-0 z-50 shadow-lg w-full">
   <div class="max-w-[1600px] mx-auto flex items-center justify-between px-2 md:px-4">
 
-    {# Logo - Ridimensionato per risparmiare spazio #}
+    {# Logo #}
     <div class="flex items-center space-x-2 shrink-0">
       <img src="{{ url_for('static', filename='Magazzino.jpg') }}" class="h-8 w-8 md:h-9 md:w-9 rounded-lg shadow-sm">
       <span class="text-base md:text-lg font-bold tracking-tighter hidden sm:inline">Magazzino PCL</span>
@@ -11,8 +11,7 @@
     {# 2. NAVIGAZIONE DESKTOP OTTIMIZZATA #}
     <nav class="hidden lg:flex items-center gap-0.5 xl:gap-1">
       {% set active = "bg-blue-600 text-white shadow-md scale-105" %}
-      {% set base = "flex items-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all duration-200
-      hover:bg-blue-500 hover:text-white text-[13px]" %}
+      {% set base = "flex items-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all duration-200 hover:bg-blue-500 hover:text-white text-[13px]" %}
 
       <a href="{{ url_for('dashboard') }}"
         class="{{ base }} {% if request.endpoint=='dashboard' %}{{ active }}{% endif %}">
@@ -29,15 +28,21 @@
         <i class="fas fa-tags text-base"></i> <span class="hidden xl:block 2xl:inline">Categorie</span>
       </a>
 
+      {# MOVIMENTI - Solo Admin e Manager #}
+      {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
       <a href="{{ url_for('movimenti_view') }}"
         class="{{ base }} {% if 'movimenti' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-exchange-alt text-base"></i> <span class="hidden xl:block 2xl:inline">Movimenti</span>
       </a>
+      {% endif %}
 
+      {# LOTTI - Solo Admin e Manager #}
+      {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
       <a href="{{ url_for('lotti_view') }}"
         class="{{ base }} {% if 'lotti' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-barcode text-base"></i> <span class="hidden xl:block 2xl:inline">Lotti</span>
       </a>
+      {% endif %}
 
       {% if session.get("ruolo") == "Amministratore" %}
       <a href="{{ url_for('elenco_prestiti') }}"
@@ -52,24 +57,21 @@
       </a>
 
       {% if session.get("ruolo") == "Amministratore" %}
-
       <a href="{{ url_for('visualizza_tutti_i_log') }}"
         class="{{ base }} {% if request.endpoint=='visualizza_tutti_i_log' %}{{ active }}{% endif %}">
-
         <i class="fas fa-history"></i> <span class="hidden xl:inline">Attività</span>
-
       </a>
-
       {% endif %}
 
+      {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
       <a href="{{ url_for('messaggi') }}"
         class="{{ base }} {% if 'messaggi' in request.endpoint %}{{ active }}{% endif %}">
         <i class="fas fa-envelope text-base"></i> <span class="hidden xl:block 2xl:inline">Messaggi</span>
       </a>
+      {% endif %}
 
       {# PROFILO UTENTE SMART #}
-      <div
-        class="flex items-center gap-2 px-2 py-1 bg-white/50 rounded-lg border border-yellow-500 ml-2 shrink-0 group">
+      <div class="flex items-center gap-2 px-2 py-1 bg-white/50 rounded-lg border border-yellow-500 ml-2 shrink-0 group">
         {% if session.get("ruolo") == "Amministratore" %}
         <i class="fas fa-user-shield text-red-600 text-lg" title="Admin"></i>
         {% elif session.get("ruolo") == "Manager" %}
@@ -90,7 +92,6 @@
       </a>
     </nav>
 
-    {# Bottone Menu Mobile (visibile sotto i 1024px) #}
     <button id="menu-btn"
       class="lg:hidden p-2 bg-white/20 hover:bg-yellow-400 rounded-lg transition-all border border-yellow-500/30">
       <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -109,8 +110,6 @@
   <div class="flex items-center justify-between mb-8 border-b border-gray-700 pb-4">
     <div class="flex flex-col">
       <span class="text-xl font-bold text-yellow-300">Menu</span>
-
-      {# INFO UTENTE LOGGATO CON ICONA DINAMICA #}
       <div class="flex items-center gap-2 mt-2">
         <div class="p-1.5 rounded-lg bg-gray-800 border border-gray-700">
           {% if session.get("ruolo") == "Amministratore" %}
@@ -127,7 +126,6 @@
         </div>
       </div>
     </div>
-
     <button id="close-btn" class="text-gray-400 hover:text-white transition-colors">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path d="M6 18L18 6M6 6l12 12" stroke-width="2" />
@@ -136,21 +134,20 @@
   </div>
 
   <nav class="flex flex-col gap-4">
-    {# Link esistenti... (Dashboard, Prodotti, ecc.) #}
-    {{ mobile_link(url_for('dashboard'), 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0
-    012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0
-    01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 'Dashboard',
-    request.endpoint=='dashboard') }}
-
-    {# Restante parte della navigazione ... #}
+    {{ mobile_link(url_for('dashboard'), 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 'Dashboard', request.endpoint=='dashboard') }}
     {{ mobile_link(url_for('prodotti_view'), 'M20 7H4v10h16V7z', 'Prodotti', 'prodotti' in request.endpoint) }}
-    {{ mobile_link(url_for('categorie_view'), 'M3 7h18M3 12h18M3 17h18', 'Categorie', 'categorie' in request.endpoint)
-    }}
-    {{ mobile_link(url_for('movimenti_view'), 'M7 16l-4-4 4-4m10 8l4-4-4-4', 'Movimenti', 'movimenti' in
-    request.endpoint) }}
-    {{ mobile_link(url_for('lotti_view'), 'M20 7l-8-4-8 4v10l8 4 8-4V7z', 'Lotti', 'lotti' in request.endpoint) }}
+    {{ mobile_link(url_for('categorie_view'), 'M3 7h18M3 12h18M3 17h18', 'Categorie', 'categorie' in request.endpoint) }}
+    
+    {# MOVIMENTI MOBILE - Solo Admin e Manager #}
+    {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+    {{ mobile_link(url_for('movimenti_view'), 'M7 16l-4-4 4-4m10 8l4-4-4-4', 'Movimenti', 'movimenti' in request.endpoint) }}
+    {% endif %}
 
-    {# Comodati - Solo Admin #}
+    {# LOTTI MOBILE - Solo Admin e Manager #}
+    {% if session.get("ruolo") in ["Amministratore", "Manager"] %}
+    {{ mobile_link(url_for('lotti_view'), 'M20 7l-8-4-8 4v10l8 4 8-4V7z', 'Lotti', 'lotti' in request.endpoint) }}
+    {% endif %}
+
     {% if session.get("ruolo") == "Amministratore" %}
     <a href="{{ url_for('elenco_prestiti') }}"
       class="flex items-center gap-4 px-4 py-3 rounded-xl transition-colors {{ 'bg-red-600 text-white' if 'prestiti' in request.endpoint else 'hover:bg-gray-800 text-red-400' }}">
@@ -159,12 +156,10 @@
     </a>
     {% endif %}
 
-    {{ mobile_link(url_for('utenti_view'), 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0
-    00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 'Utenti', 'utenti' in request.endpoint) }}
+    {{ mobile_link(url_for('utenti_view'), 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 'Utenti', 'utenti' in request.endpoint) }}
 
     {% if session.get("ruolo") in ["Amministratore","Manager"] %}
-    {{ mobile_link(url_for('messaggi'), 'M8 10h8M8 14h6m-6 6l-4 4V4a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H8z',
-    'Messaggi', 'messaggi' in request.endpoint) }}
+    {{ mobile_link(url_for('messaggi'), 'M8 10h8M8 14h6m-6 6l-4 4V4a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2H8z', 'Messaggi', 'messaggi' in request.endpoint) }}
     {% endif %}
 
     <div class="mt-6 pt-6 border-t border-gray-700">

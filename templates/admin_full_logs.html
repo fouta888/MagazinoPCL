@@ -1,36 +1,38 @@
 {% extends "base.html" %}
 {% block content %}
 
-<div class="max-w-6xl mx-auto">
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl text-yellow-500 font-bold">📂 Registri Sistema Completi</h1>
-        <a href="{{ url_for('esporta_pdf') }}" id="btn-esporta"
-            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm">
-            📄 Esporta PDF Selezione
+<div class="max-w-7xl mx-auto mt-2 p-4">
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div class="flex items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-yellow-500 leading-tight">📂 Registri Sistema Completi</h1>
+                <p class="text-xs text-gray-500 font-medium">Monitoraggio movimenti e archivio documentale riservato</p>
+            </div>
+        </div>
+        <a href="{{ url_for('esporta_pdf_audit') }}" id="btn-esporta"
+            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm shadow-md font-bold self-start md:self-center">
+            📄 Esporta Solo Movimenti
         </a>
     </div>
 
-    <div class="flex space-x-4 mb-6 border-b">
+    <div class="flex space-x-4 mb-6 border-b overflow-x-auto bg-white p-2 rounded-t-xl">
         <button onclick="switchTab('op')" id="btn-op"
-            class="py-2 px-4 border-b-2 border-green-500 text-green-600 font-bold">
-            📦 Movimenti Merce
+            class="py-2 px-4 border-b-2 border-green-500 text-green-600 font-bold whitespace-nowrap flex items-center gap-2 transition-all">
+            <i class="fas fa-boxes text-xs"></i> Movimenti Merce
         </button>
         <button onclick="switchTab('pdf')" id="btn-pdf"
-            class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-blue-600">
-            📄 Download Report
+            class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-blue-600 whitespace-nowrap flex items-center gap-2 transition-all">
+            <i class="fas fa-file-download text-xs"></i> Download Report
         </button>
-        {% if session.get("ruolo") == "Amministratore" %}
-        <a href="{{ url_for('documenti_view') }}"
-            class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-purple-600 transition inline-flex items-center gap-2">
-            <i class="fas fa-file-archive"></i>
-            <span>Archivio Documenti</span>
-        </a>
-        {% endif %}
+        <button onclick="switchTab('doc')" id="btn-doc"
+            class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-purple-600 whitespace-nowrap flex items-center gap-2 transition-all">
+            <i class="fas fa-archive text-xs"></i> Attività Archivio
+        </button>
     </div>
 
     <div id="tab-op" class="bg-white shadow-lg rounded-xl overflow-hidden border">
         <table class="w-full text-sm text-left">
-            <thead class="bg-gray-800 text-white">
+            <thead class="bg-gray-800 text-white font-bold uppercase text-[11px]">
                 <tr>
                     <th class="p-4">Data</th>
                     <th class="p-4">Utente</th>
@@ -38,14 +40,17 @@
                     <th class="p-4">Dettaglio</th>
                 </tr>
             </thead>
-            <tbody class="divide-y">
+            <tbody class="divide-y text-gray-700">
                 {% for log in logs_op %}
-                <tr class="hover:bg-gray-50">
-                    <td class="p-4 text-gray-500">{{ log[3].strftime('%d/%m/%Y %H:%M') }}</td>
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') }}</td>
                     <td class="p-4 font-bold">{{ log[0] }}</td>
-                    <td class="p-4"><span
-                            class="px-2 py-1 rounded text-xs font-bold {% if log[1]=='CARICO' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">{{
-                            log[1] }}</span></td>
+                    <td class="p-4">
+                        <span
+                            class="px-2 py-1 rounded text-[10px] font-bold uppercase {% if log[1]=='CARICO' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                            {{ log[1] }}
+                        </span>
+                    </td>
                     <td class="p-4">{{ log[2] }}</td>
                 </tr>
                 {% endfor %}
@@ -55,58 +60,396 @@
 
     <div id="tab-pdf" class="hidden bg-white shadow-lg rounded-xl overflow-hidden border">
         <table class="w-full text-sm text-left">
-            <thead class="bg-gray-800 text-white">
+            <thead class="bg-gray-800 text-white font-bold uppercase text-[11px]">
                 <tr>
                     <th class="p-4">Data</th>
                     <th class="p-4">Utente</th>
                     <th class="p-4">Report</th>
-                    <th class="p-4">Filtro Anno</th>
+                    <th class="p-4">Filtro</th>
                 </tr>
             </thead>
-            <tbody class="divide-y">
+            <tbody class="divide-y text-gray-700">
                 {% for log in logs_pdf %}
-                <tr class="hover:bg-gray-50">
-                    <td class="p-4 text-gray-500">{{ log[3].strftime('%d/%m/%Y %H:%M') }}</td>
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') }}</td>
                     <td class="p-4 font-bold text-blue-600">{{ log[0] }}</td>
-                    <td class="p-4 uppercase font-bold text-xs">{{ log[1] }}</td>
+                    <td class="p-4 uppercase text-xs">{{ log[1] }}</td>
                     <td class="p-4">{{ log[2] or 'Completo' }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <div id="tab-doc" class="hidden space-y-6 animate-fade-in">
+
+        <div
+            class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-purple-100">
+            <div class="relative flex-1 w-full">
+                <i class="fas fa-search absolute left-3 top-3.5 text-gray-400"></i>
+                <input type="text" id="docSearch" placeholder="Cerca titolo, categoria o utente..."
+                    class="w-full p-2.5 pl-10 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-400 outline-none"
+                    onkeyup="filterDocs()">
+            </div>
+            <div class="flex gap-2 w-full md:w-auto">
+                <button onclick="toggleCronologia()"
+                    class="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition flex items-center gap-2 justify-center border">
+                    <i class="fas fa-history text-purple-600"></i> Cronologia
+                </button>
+                <button onclick="toggleFormDocumenti()"
+                    class="bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-green-700 transition flex items-center gap-2 justify-center">
+                    <i class="fas fa-file-medical"></i> Nuovo Caricamento
+                </button>
+            </div>
+        </div>
+
+        <div id="container-crea" class="hidden bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-500 relative">
+            <button onclick="toggleFormDocumenti()" class="absolute top-4 right-4 text-gray-400 hover:text-red-500">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            <h2 class="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
+                <i class="fas fa-upload text-green-600"></i> Allega Documenti ai Registri
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase">Titolo Gruppo</label>
+                    <input type="text" id="titolo_multiplo" class="w-full border rounded-lg p-2 text-sm"
+                        placeholder="Es: Registri 2026">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase">Categoria</label>
+                    <select id="categoria_doc" class="w-full border rounded-lg p-2 text-sm bg-white font-medium">
+                        <option value="Generale">Generale</option>
+                        <option value="Fatture">Fatture</option>
+                        <option value="Certificazioni">Certificazioni</option>
+                        <option value="Lotti">Lotti</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase">File</label>
+                    <input type="file" id="file_input_hidden" multiple class="hidden"
+                        onchange="handleFileSelection(this)">
+                    <button type="button" onclick="document.getElementById('file_input_hidden').click()"
+                        class="w-full bg-gray-50 border-2 border-dashed border-gray-300 p-2 rounded-lg text-gray-600 hover:border-green-400 transition text-sm font-bold">
+                        <i class="fas fa-paperclip"></i> Allega File
+                    </button>
+                    <div id="file-list-accumulated" class="mt-2 space-y-1"></div>
+                </div>
+                <button type="button" onclick="uploadTutto()"
+                    class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 font-bold shadow-md">
+                    Avvia Upload
+                </button>
+            </div>
+            <div id="progressContainer" class="hidden mt-4 bg-gray-100 p-3 rounded-lg">
+                <div class="w-full bg-gray-300 rounded-full h-2">
+                    <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+                <p id="progressPercent" class="text-center text-[10px] font-bold text-blue-700 mt-1 uppercase">0%</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div class="bg-purple-50 p-3 border-b font-bold text-purple-800 text-sm flex items-center gap-2">
+                <i class="fas fa-folder-open text-purple-600"></i> Documenti Disponibili
+            </div>
+            <table class="w-full text-left" id="docTable">
+                <thead class="bg-gray-100 text-gray-600 uppercase text-[10px] font-bold">
+                    <tr>
+                        <th class="px-6 py-3">Documento / Categoria</th>
+                        <th class="px-6 py-3 text-center">Visualizza</th>
+                        <th class="px-6 py-3">Data</th>
+                        <th class="px-6 py-3 text-center">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {% for doc in documenti %}
+                    <tr class="hover:bg-purple-50 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="font-bold text-gray-800">{{ doc[0] }}</div>
+                            <span
+                                class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-black uppercase">{{
+                                doc[4] or 'Generale' }}</span>
+                        </td>
+                        <td class="px-6 py-4 flex justify-center gap-2">
+                            {% for file in doc[3] %}
+                            <button onclick="gestisciAnteprima(this)"
+                                data-url="{{ url_for('static', filename='uploads/documenti/' + file) }}"
+                                data-ext="{{ file.split('.')[-1].lower() }}"
+                                class="text-red-500 hover:scale-125 transition-transform p-1">
+                                <i class="fas fa-file-pdf text-xl"></i>
+                            </button>
+                            {% endfor %}
+                        </td>
+                        <td class="px-6 py-4 text-xs text-gray-500 italic">{{ doc[1].strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="px-6 py-4 text-center">
+                            <button onclick="eliminaGruppo('{{ doc[0] }}', '{{ doc[1].isoformat() }}')"
+                                class="text-red-400 hover:text-red-600 transition-colors">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="container-cronologia"
+            class="hidden bg-white shadow-lg rounded-xl overflow-hidden border animate-fade-in">
+            <div class="bg-gray-800 text-white p-3 font-bold text-sm flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-history text-gray-400 text-xs"></i> Cronologia Azioni Archivio
+                </div>
+                <button onclick="toggleCronologia()" class="text-gray-400 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <table class="w-full text-sm text-left">
+                <thead class="bg-purple-50 text-purple-900 text-[10px] uppercase font-black">
+                    <tr>
+                        <th class="p-4">Data</th>
+                        <th class="p-4">Utente</th>
+                        <th class="p-4">Azione</th>
+                        <th class="p-4">Documento</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y text-gray-700">
+                    {% for log in logs_doc %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') if log[3] else
+                            'Data N.D.' }}</td>
+                        <td class="p-4 font-bold text-purple-600">{{ log[0] }}</td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded text-[10px] font-bold uppercase 
+                              {% if log[1] == 'ELIMINAZIONE' %}
+                              bg-red-100 text-red-700
+                              {% elif log[1] == 'DOWNLOAD' %}
+                              bg-green-100 text-green-700
+                              {% else %}
+                              bg-blue-100 text-blue-700
+                              {% endif %}">
+                                {{ log[1] }}
+                            </span>
+                        </td>
+                        <td class="p-4 font-medium">{{ log[2] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="modalPreview" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="font-bold text-gray-700 flex items-center gap-2"><i class="fas fa-eye text-blue-500"></i>
+                Anteprima Documento</h3>
+            <button onclick="chiudiAnteprima()" class="text-gray-400 hover:text-red-500 text-2xl">×</button>
+        </div>
+        <div id="previewContent" class="flex-1 overflow-auto bg-gray-200 flex justify-center items-center"></div>
+        <div class="p-3 border-t bg-gray-50 text-center">
+            <button id="btnDownloadModal"
+                class="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-md">
+                <i class="fas fa-download mr-1"></i> Scarica Originale
+            </button>
+        </div>
+    </div>
 </div>
 
 <script>
+
+    let fileBuffer = [];
+
+    // --- LOGICA TAB ---
     function switchTab(tab) {
-        const tabOp = document.getElementById('tab-op');
-        const tabPdf = document.getElementById('tab-pdf');
-        const btnOp = document.getElementById('btn-op');
-        const btnPdf = document.getElementById('btn-pdf');
-        const btnEsporta = document.getElementById('btn-esporta'); // Seleziona il pulsante di stampa
+        const sections = { 'op': 'tab-op', 'pdf': 'tab-pdf', 'doc': 'tab-doc' };
+        const buttons = { 'op': 'btn-op', 'pdf': 'btn-pdf', 'doc': 'btn-doc' };
+        const config = {
+            'op': { color: 'green', text: '📄 Esporta Solo Movimenti', url: "{{ url_for('esporta_pdf_audit') }}" },
+            'pdf': { color: 'blue', text: '📄 Esporta Registro Download', url: "{{ url_for('esporta_pdf') }}" },
+            'doc': { color: 'purple', text: '📄 Esporta Log Archivio', url: "{{ url_for('esporta_log_archivio') }}" }
+        };
 
-        if (tab === 'op') {
-            // Mostra Tabella Movimenti
-            tabOp.classList.remove('hidden');
-            tabPdf.classList.add('hidden');
-            btnOp.className = "py-2 px-4 border-b-2 border-green-500 text-green-600 font-bold";
-            btnPdf.className = "py-2 px-4 border-b-2 border-transparent text-gray-500";
+        Object.values(sections).forEach(id => document.getElementById(id).classList.add('hidden'));
+        Object.keys(buttons).forEach(key => {
+            document.getElementById(buttons[key]).className = "py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition whitespace-nowrap";
+        });
 
-            // Cambia il pulsante per stampare i Movimenti
-            btnEsporta.href = "{{ url_for('esporta_pdf_audit') }}";
-            btnEsporta.innerText = "📄 Esporta Solo Movimenti";
-        } else {
-            // Mostra Tabella Download PDF
-            tabOp.classList.add('hidden');
-            tabPdf.classList.remove('hidden');
-            btnPdf.className = "py-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold";
-            btnOp.className = "py-2 px-4 border-b-2 border-transparent text-gray-500";
+        document.getElementById(sections[tab]).classList.remove('hidden');
+        document.getElementById(buttons[tab]).className = `py-2 px-4 border-b-2 border-${config[tab].color}-500 text-${config[tab].color}-600 font-bold whitespace-nowrap transition`;
 
-            // Cambia il pulsante per stampare il Registro Download
-            btnEsporta.href = "{{ url_for('esporta_pdf') }}";
-            btnEsporta.innerText = "📄 Esporta Registro Download";
+        const btnEsp = document.getElementById('btn-esporta');
+        btnEsp.innerText = config[tab].text;
+        btnEsp.href = config[tab].url;
+        btnEsp.className = `bg-${config[tab].color === 'purple' ? 'purple' : (config[tab].color === 'green' ? 'red' : 'blue')}-600 text-white px-4 py-2 rounded-lg hover:opacity-80 transition text-sm shadow-md font-bold`;
+    }
+
+    // --- LOGICA UI ---
+    function toggleFormDocumenti() {
+        document.getElementById('container-crea').classList.toggle('hidden');
+    }
+
+    function toggleCronologia() {
+        const crono = document.getElementById('container-cronologia');
+        crono.classList.toggle('hidden');
+        if (!crono.classList.contains('hidden')) {
+            setTimeout(() => {
+                crono.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 100);
         }
+    }
+
+    // --- LOGICA CARICAMENTO ---
+    function handleFileSelection(input) {
+        Array.from(input.files).forEach(file => {
+            if (!fileBuffer.some(f => f.name === file.name)) fileBuffer.push(file);
+        });
+        input.value = "";
+        aggiornaListaAnteprima();
+    }
+
+    function aggiornaListaAnteprima() {
+        const container = document.getElementById('file-list-accumulated');
+        container.innerHTML = fileBuffer.map((f, i) => `
+            <div class="flex items-center justify-between bg-purple-50 p-1 px-2 rounded border border-purple-100 text-[10px] animate-fade-in">
+                <span class="truncate"><i class="fas fa-paperclip text-purple-400"></i> ${f.name}</span>
+                <button onclick="fileBuffer.splice(${i},1);aggiornaListaAnteprima()" class="text-red-400 font-bold px-1 hover:text-red-600">×</button>
+            </div>
+        `).join('');
+    }
+
+    function uploadTutto() {
+        const titolo = document.getElementById('titolo_multiplo').value;
+        const categoria = document.getElementById('categoria_doc').value;
+        if (!titolo) return alert("Inserisci un titolo");
+        if (fileBuffer.length === 0) return alert("Allega almeno un file");
+
+        const formData = new FormData();
+        formData.append("titolo", titolo);
+        formData.append("categoria", categoria);
+        fileBuffer.forEach(file => formData.append("file_allegato", file));
+
+        const xhr = new XMLHttpRequest();
+        document.getElementById('progressContainer').classList.remove('hidden');
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                document.getElementById('progressBar').style.width = percent + "%";
+                document.getElementById('progressPercent').innerText = percent + "%";
+            }
+        };
+
+        xhr.onload = () => { if (xhr.status === 200) location.reload(); else alert("Errore durante l'upload"); };
+        xhr.open("POST", "{{ url_for('documenti_view') }}", true);
+        xhr.send(formData);
+    }
+
+    // --- LOGICA ANTEPRIMA E LOGGING ---
+    function gestisciAnteprima(elemento) {
+        const url = elemento.getAttribute('data-url');
+        const ext = elemento.getAttribute('data-ext');
+        const riga = elemento.closest('tr');
+        const titoloDoc = riga.querySelector('.font-bold.text-gray-800').innerText;
+        const nomeFile = url.split('/').pop();
+
+        // 1. LOG DI APERTURA ANTEPRIMA
+        inviaLogArchivio(titoloDoc, nomeFile, "ANTEPRIMA");
+
+        const content = document.getElementById('previewContent');
+        const btnDl = document.getElementById('btnDownloadModal');
+
+        // 2. LOG DI DOWNLOAD (Quando clicca il tasto nel modal)
+        btnDl.onclick = () => {
+            inviaLogArchivio(titoloDoc, nomeFile, "DOWNLOAD");
+            window.open(url, '_blank');
+        };
+
+        content.innerHTML = '';
+        if (ext === 'pdf') {
+            content.innerHTML = `<iframe src="${url}" class="w-full h-full border-none"></iframe>`;
+        } else if (['jpg', 'jpeg', 'png'].includes(ext)) {
+            content.innerHTML = `<img src="${url}" class="max-w-full max-h-full object-contain" />`;
+        } else {
+            content.innerHTML = `<p class="text-gray-500">Anteprima non disponibile per .${ext.toUpperCase()}</p>`;
+        }
+
+        document.getElementById('modalPreview').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    // Funzione di supporto per evitare ripetizioni di codice
+    function inviaLogArchivio(titolo, file, tipoAzione) {
+        fetch("/documenti/log_stampa", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                titolo: titolo,
+                file: file,
+                azione: tipoAzione // Passiamo il tipo di azione qui
+            })
+        }).catch(err => console.error("Errore log:", err));
+    }
+
+    function chiudiAnteprima() {
+        document.getElementById('modalPreview').classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    function eliminaGruppo(titolo, dataISO) {
+        if (confirm(`Eliminare definitivamente il gruppo "${titolo}"?`)) {
+            const fd = new FormData();
+            fd.append("titolo", titolo);
+            fd.append("data", dataISO);
+            fetch("/documenti/elimina_gruppo", { method: 'POST', body: fd }).then(r => { if (r.ok) location.reload(); });
+        }
+    }
+
+    function filterDocs() {
+        let input = document.getElementById("docSearch").value.toLowerCase();
+        let rows = document.querySelectorAll("#docTable tbody tr");
+        rows.forEach(row => row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none");
     }
 </script>
 
+<style>
+    /* IL POSTO GIUSTO È QUESTO */
+    footer {
+        display: none !important;
+    }
+
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<style>
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
 {% endblock %}
