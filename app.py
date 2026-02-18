@@ -908,6 +908,428 @@ def controlla_scadenze():
     return alert
 
 
+@app.route("/mezzi/aggiorna_scorta", methods=["POST"])
+@login_required
+def aggiorna_scorta_mezzo():
+    data = request.json
+    mezzo_id = data.get('mezzo_id')
+    prodotto_id = data.get('prodotto_id')
+    quantita_variazione = int(data.get('quantita'))
+    operazione = data.get('operazione')
+
+    db = get_db()
+    cur = db.cursor()
+
+    try:
+        # Recupera nome e targa per un log professionale
+        cur.execute("SELECT nome, targa FROM mezzi WHERE id = %s", (mezzo_id,))
+        mezzo = cur.fetchone()
+        identificativo_mezzo = f"{mezzo[0]} ({mezzo[1]})" if mezzo[1] else mezzo[0]
+
+        if operazione == "carica":
+            cur.execute("SELECT id FROM lotti WHERE prodotto_id = %s AND quantita >= %s ORDER BY data_scadenza ASC LIMIT 1", 
+                       (prodotto_id, quantita_variazione))
+            lotto = cur.fetchone()
+            if not lotto:
+                return jsonify({"error": "Giacenza insufficiente in magazzino"}), 400
+            
+            lotto_id = lotto[0]
+            cur.execute("UPDATE lotti SET quantita = quantita - %s WHERE id = %s", (quantita_variazione, lotto_id))
+            cur.execute("""
+                INSERT INTO inventario_mezzi (mezzo_id, prodotto_id, lotto_id, quantita, quantita_standard)
+                VALUES (%s, %s, %s, %s, 0)
+                ON CONFLICT (mezzo_id, prodotto_id, (COALESCE(lotto_id, -1))) 
+                DO UPDATE SET quantita = inventario_mezzi.quantita + EXCLUDED.quantita
+            """, (mezzo_id, prodotto_id, lotto_id, quantita_variazione))
+
+            # LOG: Carico su Targa
+            cur.execute("""
+                INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, dettaglio, data_movimento)
+                VALUES (%s, %s, 'uscita', %s, %s, CURRENT_TIMESTAMP)
+            """, (prodotto_id, lotto_id, quantita_variazione, f"Carico su {identificativo_mezzo}"))
+
+        elif operazione == "scarica":
+            cur.execute("""
+                SELECT id, lotto_id FROM inventario_mezzi 
+                WHERE mezzo_id = %s AND prodotto_id = %s AND quantita >= %s 
+                ORDER BY lotto_id NULLS LAST LIMIT 1
+            """, (mezzo_id, prodotto_id, quantita_variazione))
+            riga = cur.fetchone()
+            
+            if not riga:
+                return jsonify({"error": "Quantità insufficiente sul mezzo"}), 400
+            
+            inv_id, lotto_id_da_mezzo = riga
+            cur.execute("UPDATE inventario_mezzi SET quantita = quantita - %s WHERE id = %s", (quantita_variazione, inv_id))
+            
+            target_lotto = lotto_id_da_mezzo
+            if not target_lotto:
+                cur.execute("SELECT id FROM lotti WHERE prodotto_id = %s ORDER BY id DESC LIMIT 1", (prodotto_id,))
+                target_lotto = cur.fetchone()[0]
+
+            cur.execute("UPDATE lotti SET quantita = quantita + %s WHERE id = %s", (quantita_variazione, target_lotto))
+
+            # LOG: Scarico da Targa
+            cur.execute("""
+                INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, dettaglio, data_movimento)
+                VALUES (%s, %s, 'entrata', %s, %s, CURRENT_TIMESTAMP)
+            """, (prodotto_id, target_lotto, quantita_variazione, f"Scarico da {identificativo_mezzo}"))
+
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+from datetime import datetime, timedelta # Fondamentale per le scadenze
+
+@app.route("/mezzo/<int:mezzo_id>/checklist")
+@login_required
+def checklist_mezzo(mezzo_id):
+    db = get_db()
+    cur = db.cursor()
+    current_date_plus_30 = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+    
+    cur.execute("SELECT nome, tipo, uso FROM mezzi WHERE id = %s", (mezzo_id,))
+    mezzo = cur.fetchone()
+
+    # Questa query "fonde" lo standard (senza lotto) con le giacenze (con lotto)
+    cur.execute("""
+        SELECT 
+            p.nome, 
+            SUM(im.quantita) as giacenza_totale, 
+            MAX(im.quantita_standard) as standard,
+            p.id,
+            MIN(l.data_scadenza) as scadenza_vicina
+        FROM inventario_mezzi im
+        JOIN prodotti p ON im.prodotto_id = p.id
+        LEFT JOIN lotti l ON im.lotto_id = l.id
+        WHERE im.mezzo_id = %s
+        GROUP BY p.id, p.nome
+        ORDER BY standard DESC, p.nome ASC
+    """, (mezzo_id,))
+    
+    prodotti = cur.fetchall()
+    db.close()
+    
+    return render_template("checklist_mezzo.html", mezzo=mezzo, prodotti=prodotti, 
+                           mezzo_id=mezzo_id, current_date_plus_30=current_date_plus_30)
+
+
+@app.route("/mezzo/<int:mezzo_id>/imposta_standard", methods=["GET", "POST"])
+@login_required
+@ruolo_required("Amministratore")
+def imposta_standard(mezzo_id):
+    db = get_db()
+    cur = db.cursor()
+
+    if request.method == "POST":
+        prodotto_id = request.form.get("prodotto_id")
+        qta_standard = request.form.get("qta_standard")
+        
+        try:
+            # Usiamo COALESCE(lotto_id, -1) per puntare alla riga dello "standard"
+            cur.execute("""
+                INSERT INTO inventario_mezzi (mezzo_id, prodotto_id, quantita_standard, quantita, lotto_id)
+                VALUES (%s, %s, %s, 0, NULL)
+                ON CONFLICT (mezzo_id, prodotto_id, (COALESCE(lotto_id, -1))) 
+                DO UPDATE SET quantita_standard = EXCLUDED.quantita_standard
+            """, (mezzo_id, prodotto_id, qta_standard))
+            db.commit()
+            flash("Standard aggiornato con successo!", "success")
+            return redirect(url_for('imposta_standard', mezzo_id=mezzo_id))
+        except Exception as e:
+            db.rollback()
+            flash(f"Errore: {str(e)}", "danger")
+
+    cur.execute("SELECT nome FROM mezzi WHERE id = %s", (mezzo_id,))
+    mezzo_nome = cur.fetchone()[0]
+    cur.execute("SELECT id, nome FROM prodotti ORDER BY nome ASC")
+    tutti_prodotti = cur.fetchall()
+    db.close()
+    
+    return render_template("imposta_standard.html", mezzo_id=mezzo_id, nome=mezzo_nome, prodotti=tutti_prodotti)
+
+
+@app.route("/mezzo/<int:mezzo_id>/elimina_standard/<int:prodotto_id>", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def elimina_standard(mezzo_id, prodotto_id):
+    db = get_db()
+    cur = db.cursor()
+    try:
+        # Eliminiamo la riga specifica per quel mezzo e quel prodotto
+        cur.execute("""
+            DELETE FROM inventario_mezzi 
+            WHERE mezzo_id = %s AND prodotto_id = %s
+        """, (mezzo_id, prodotto_id))
+        db.commit()
+        flash("Prodotto rimosso dalla dotazione del mezzo.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore durante l'eliminazione: {str(e)}", "danger")
+    finally:
+        db.close()
+    return redirect(url_for('checklist_mezzo', mezzo_id=mezzo_id))
+
+
+@app.route("/mezzo/<int:mezzo_id>/ripristina", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def ripristina_mezzo(mezzo_id):
+    db = get_db()
+    cur = db.cursor()
+    try:
+        cur.execute("SELECT nome, targa FROM mezzi WHERE id = %s", (mezzo_id,))
+        mezzo = cur.fetchone()
+        targa_log = mezzo[1] if mezzo[1] else mezzo[0]
+
+        cur.execute("""
+            SELECT prodotto_id, (MAX(quantita_standard) - SUM(quantita)) as da_ripristinare 
+            FROM inventario_mezzi 
+            WHERE mezzo_id = %s 
+            GROUP BY prodotto_id
+            HAVING SUM(quantita) < MAX(quantita_standard)
+        """, (mezzo_id,))
+        mancanti = cur.fetchall()
+
+        for p_id, qta_da_aggiungere in mancanti:
+            cur.execute("""
+                SELECT id FROM lotti 
+                WHERE prodotto_id = %s AND quantita >= %s 
+                ORDER BY data_scadenza ASC LIMIT 1
+            """, (p_id, qta_da_aggiungere))
+            lotto = cur.fetchone()
+
+            if lotto:
+                lotto_id = lotto[0]
+                cur.execute("UPDATE lotti SET quantita = quantita - %s WHERE id = %s", (qta_da_aggiungere, lotto_id))
+                
+                cur.execute("""
+                    INSERT INTO inventario_mezzi (mezzo_id, prodotto_id, lotto_id, quantita, quantita_standard)
+                    VALUES (%s, %s, %s, %s, 0)
+                    ON CONFLICT (mezzo_id, prodotto_id, (COALESCE(lotto_id, -1))) 
+                    DO UPDATE SET quantita = inventario_mezzi.quantita + EXCLUDED.quantita
+                """, (mezzo_id, p_id, lotto_id, qta_da_aggiungere))
+                
+                # LOG: Ripristino con Targa
+                cur.execute("""
+                    INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, dettaglio, data_movimento)
+                    VALUES (%s, %s, 'uscita', %s, %s, CURRENT_TIMESTAMP)
+                """, (p_id, lotto_id, qta_da_aggiungere, f"Ripristino standard: {targa_log}"))
+
+        db.commit()
+        flash(f"Mezzo {targa_log} ripristinato e movimenti registrati!", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore: {str(e)}", "danger")
+    finally:
+        db.close()
+    return redirect(url_for('checklist_mezzo', mezzo_id=mezzo_id))
+
+
+@app.route("/admin/mezzi/gestione")
+@login_required
+@ruolo_required("Amministratore")
+def gestione_mezzi():
+    db = get_db()
+    cur = db.cursor()
+    # La query ora recupera anche la somma delle quantità nell'inventario
+    cur.execute("""
+        SELECT 
+            m.id, 
+            m.nome, 
+            m.targa, 
+            m.tipo, 
+            m.uso, 
+            m.attivo,
+            COALESCE(SUM(im.quantita), 0) as totale_pezzi
+        FROM mezzi m
+        LEFT JOIN inventario_mezzi im ON m.id = im.mezzo_id
+        GROUP BY m.id, m.nome, m.targa, m.tipo, m.uso, m.attivo
+        ORDER BY m.id ASC
+    """)
+    mezzi = cur.fetchall()
+    db.close()
+    return render_template("gestione_mezzi.html", mezzi=mezzi)
+
+
+@app.route("/admin/mezzi/update/<int:id>", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def update_mezzo(id):
+    nome = request.form.get("nome")
+    targa = request.form.get("targa").upper()
+    uso = request.form.get("uso")
+    
+    db = get_db()
+    cur = db.cursor()
+    try:
+        cur.execute("""
+            UPDATE mezzi 
+            SET nome = %s, targa = %s, uso = %s 
+            WHERE id = %s
+        """, (nome, targa, uso, id))
+        db.commit()
+        flash(f"Mezzo {targa} aggiornato correttamente!", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore: {e}", "danger")
+    finally:
+        db.close()
+    return redirect(url_for('gestione_mezzi'))
+
+
+@app.route("/admin/mezzi/scarica_tutto/<int:id>", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def scarica_tutto_mezzo(id):
+    db = get_db()
+    cur = db.cursor()
+    try:
+        # 1. Recupera tutto il carico attuale del mezzo che ha quantità > 0
+        cur.execute("""
+            SELECT prodotto_id, lotto_id, quantita 
+            FROM inventario_mezzi 
+            WHERE mezzo_id = %s AND quantita > 0
+        """, (id,))
+        carico = cur.fetchall()
+
+        if not carico:
+            flash("Il mezzo è già vuoto.", "info")
+            return redirect(url_for('gestione_mezzi'))
+
+        for prodotto_id, lotto_id, qta in carico:
+            # 2. Riporta la merce nel magazzino (lotti)
+            # Se il lotto_id non esiste (caso raro), cerchiamo l'ultimo lotto creato per quel prodotto
+            if lotto_id:
+                cur.execute("UPDATE lotti SET quantita = quantita + %s WHERE id = %s", (qta, lotto_id))
+            else:
+                cur.execute("SELECT id FROM lotti WHERE prodotto_id = %s ORDER BY id DESC LIMIT 1", (prodotto_id,))
+                last_lotto = cur.fetchone()
+                if last_lotto:
+                    cur.execute("UPDATE lotti SET quantita = quantita + %s WHERE id = %s", (qta, last_lotto[0]))
+
+            # 3. Registra il movimento di rientro
+            cur.execute("SELECT targa FROM mezzi WHERE id = %s", (id,))
+            targa = cur.fetchone()[0]
+            cur.execute("""
+                INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, dettaglio, data_movimento)
+                VALUES (%s, %s, 'entrata', %s, %s, CURRENT_TIMESTAMP)
+            """, (prodotto_id, lotto_id, qta, f"Scarico totale di emergenza da {targa}"))
+
+        # 4. Azzera le quantità sul mezzo (senza eliminare le righe dello standard)
+        cur.execute("UPDATE inventario_mezzi SET quantita = 0 WHERE mezzo_id = %s", (id,))
+        
+        db.commit()
+        flash("Tutti i prodotti sono stati riportati in magazzino con successo!", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore durante lo scarico: {e}", "danger")
+    finally:
+        db.close()
+    return redirect(url_for('gestione_mezzi'))
+
+
+@app.route("/admin/mezzi/elimina/<int:id>", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def elimina_mezzo(id):
+    db = get_db()
+    cur = db.cursor()
+    try:
+        # 1. Controlliamo se ci sono prodotti con quantità > 0 sul mezzo
+        cur.execute("""
+            SELECT SUM(quantita) FROM inventario_mezzi 
+            WHERE mezzo_id = %s
+        """, (id,))
+        totale_prodotti = cur.fetchone()[0] or 0
+
+        if totale_prodotti > 0:
+            flash(f"Impossibile eliminare: il mezzo ha ancora {int(totale_prodotti)} prodotti a bordo. Effettua prima lo scarico totale!", "danger")
+            return redirect(url_for('gestione_mezzi'))
+
+        # 2. Se il mezzo è vuoto, procediamo con l'eliminazione
+        # Eliminiamo prima le righe dello standard (quantità 0 ma presenti)
+        cur.execute("DELETE FROM inventario_mezzi WHERE mezzo_id = %s", (id,))
+        cur.execute("DELETE FROM mezzi WHERE id = %s", (id,))
+        
+        db.commit()
+        flash("Mezzo eliminato correttamente.", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore tecnico: {e}", "danger")
+    finally:
+        db.close()
+    return redirect(url_for('gestione_mezzi'))
+
+
+@app.route("/admin/mezzi/salva_nuovo", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def salva_mezzo():
+    nome = request.form.get("nome")
+    targa = request.form.get("targa").upper()
+    uso = request.form.get("uso")
+    
+    db = get_db()
+    cur = db.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO mezzi (nome, targa, uso, tipo, attivo) 
+            VALUES (%s, %s, %s, 'Mezzo', TRUE)
+        """, (nome, targa, uso))
+        db.commit()
+        flash("Nuovo mezzo aggiunto correttamente!", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore: {e}", "danger")
+    finally:
+        db.close()
+    return redirect(url_for('gestione_mezzi'))
+
+
+
+# Rotta per vedere le Ambulanze
+# PER LE AMBULANZE (Soccorso e Assistenza)
+@app.route("/mezzi/ambulanze")
+def lista_ambulanze():
+    db = get_db()
+    cur = db.cursor()
+    # Cerchiamo solo Soccorso e Assistenza
+    cur.execute("SELECT id, nome, uso, targa FROM mezzi WHERE uso IN ('Soccorso', 'Assistenza') AND attivo = TRUE")
+    mezzi = cur.fetchall()
+    db.close()
+    return render_template("lista_mezzi.html", mezzi=mezzi, titolo="Ambulanze Emergenza")
+
+# PER IL TRASPORTO (Panda e Ambulanza Trasporto)
+@app.route("/mezzi/trasporto")
+def lista_trasporto():
+    db = get_db()
+    cur = db.cursor()
+    # Cerchiamo solo chi fa Trasporto
+    cur.execute("SELECT id, nome, uso, targa FROM mezzi WHERE uso = 'Trasporto' AND attivo = TRUE")
+    mezzi = cur.fetchall()
+    db.close()
+    return render_template("lista_mezzi.html", mezzi=mezzi, titolo="Mezzi di Trasporto")
+
+
+# Rotta per le Cassette/Zaini
+@app.route("/mezzi/cassette")
+@login_required
+def lista_cassette():
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("SELECT id, nome, uso, targa FROM mezzi WHERE tipo = 'Presidio' AND attivo = TRUE")
+    mezzi = cur.fetchall()
+    db.close()
+    return render_template("lista_mezzi.html", mezzi=mezzi, titolo="Cassette e Zaini")
+
+
+
+
 # -------- PRODOTTI --------
 @app.route("/prodotti")
 @ruolo_required("Amministratore", "Manager", "Utente")
@@ -952,6 +1374,7 @@ def prodotti_view():
     conn.close()
 
     return render_template("prodotti.html", prodotti=prodotti, filtro_attivo=filtro, oggi=oggi)
+
 
 @app.route("/prodotti/nuovo", methods=["GET", "POST"])
 @login_required
@@ -1140,22 +1563,26 @@ def elimina_prodotto(prodotto_id):
 @app.route("/lista_spesa")
 @login_required
 def lista_spesa():
-    # Recupera il ruolo, pulisce spazi e rende la prima lettera maiuscola
-    ruolo_attuale = str(session.get("ruolo", "")).strip().capitalize()
+    # Recupera il ruolo in modo sicuro
+    ruolo = session.get("ruolo", "")
     
-    if ruolo_attuale != "Amministratore":
-        flash("⛔ Accesso negato: Solo l'Amministratore può vedere la lista della spesa.", "danger")
-        return redirect(url_for("dashboard")) # Lo rispedisce in home
+    # Controllo rigoroso: solo "Amministratore" passa
+    if ruolo != "Amministratore":
+        flash("⛔ Accesso negato: Solo l'Amministratore può visualizzare la lista spesa.", "danger")
+        return redirect(url_for("dashboard"))
 
     db = get_db()
     cur = db.cursor()
+    # Usiamo la query che calcola la quantità reale dai lotti per coerenza
     cur.execute("""
-        SELECT id, nome, quantita, quantita_minima, posizione
-        FROM prodotti
-        WHERE quantita <= quantita_minima 
-          AND attivo = TRUE
-          AND quantita_minima > 0
-        ORDER BY posizione ASC
+        SELECT p.id, p.nome, COALESCE(SUM(l.quantita), 0) as quantita_reale, p.quantita_minima, p.posizione
+        FROM prodotti p
+        LEFT JOIN lotti l ON p.id = l.prodotto_id
+        WHERE p.attivo = TRUE 
+          AND p.quantita_minima > 0
+        GROUP BY p.id, p.nome, p.quantita_minima, p.posizione
+        HAVING COALESCE(SUM(l.quantita), 0) < p.quantita_minima
+        ORDER BY p.posizione ASC
     """)
     prodotti_bassi = cur.fetchall()
     db.close()
@@ -1882,20 +2309,43 @@ def audit_operazioni():
 def visualizza_tutti_i_log():
     conn = get_db()
     cur = conn.cursor()
+
+    try:
+        cur.execute("ALTER TABLE movimenti ADD COLUMN IF NOT EXISTS dettaglio TEXT;")
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Nota: Colonna già esistente o errore minore: {e}")
     
     # 1. Log dei Download PDF
     cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC LIMIT 50")
     logs_pdf = cur.fetchall()
     
-    # 2. Log delle Operazioni
+    # 2. Log delle Operazioni (Login, modifiche utenti, etc.)
     cur.execute("SELECT username, azione, dettaglio, data_operazione FROM log_operazioni ORDER BY data_operazione DESC LIMIT 50")
     logs_op = cur.fetchall()
     
-    # 3. Log Archivio Riservato (Azioni admin)
+    # 3. Log Archivio Riservato (Azioni sui documenti)
     cur.execute("SELECT utente, azione, titolo_documento, data_azione, dettagli FROM log_documenti ORDER BY data_azione DESC LIMIT 50")
     logs_doc = cur.fetchall()
 
-    # 4. DATI ARCHIVIO (Per visualizzare la tabella documenti e caricare nuovi file)
+    # 4. Registro Movimenti Mezzi e Magazzino (NEW)
+    # Questa query unisce i nomi dei prodotti per una lettura chiara
+    cur.execute("""
+        SELECT 
+            m.data_movimento, 
+            p.nome as prodotto, 
+            m.tipo_movimento, 
+            m.quantita, 
+            COALESCE(m.dettaglio, 'Nessun dettaglio')
+        FROM movimenti m
+        JOIN prodotti p ON m.prodotto_id = p.id
+        ORDER BY m.data_movimento DESC 
+        LIMIT 100
+    """)
+    logs_movimenti = cur.fetchall()
+
+    # 5. Dati Archivio Documenti
     cur.execute("""
         SELECT 
             titolo, 
@@ -1914,7 +2364,8 @@ def visualizza_tutti_i_log():
                            logs_pdf=logs_pdf, 
                            logs_op=logs_op, 
                            logs_doc=logs_doc,
-                           documenti=documenti) # Fondamentale per la Tab Documenti
+                           logs_movimenti=logs_movimenti,
+                           documenti=documenti)
 
 
 import os

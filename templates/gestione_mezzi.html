@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto mt-10 p-6 bg-white shadow-xl rounded-2xl">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+            <a href="javascript:history.back()" class="text-gray-400 hover:text-blue-600 transition-colors">
+                <i class="fas fa-arrow-left text-xl"></i>
+            </a>
+            <h1 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                <i class="fas fa-bus text-blue-600"></i> Configurazione Flotta
+            </h1>
+        </div>
+
+        <button onclick="toggleNuovoMezzo()"
+            class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md hover:bg-blue-700 transition flex items-center gap-2">
+            <i class="fas fa-plus"></i> Nuovo Mezzo
+        </button>
+    </div>
+
+    <div id="form-nuovo-mezzo" class="hidden mb-8 p-6 bg-blue-50 border border-blue-100 rounded-xl animate-fade-in">
+        <h3 class="text-blue-800 font-bold mb-4 flex items-center gap-2"><i class="fas fa-plus-circle"></i> Registra
+            Nuovo Mezzo</h3>
+        <form action="{{ url_for('salva_mezzo') }}" method="POST"
+            class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Identificativo</label>
+                <input type="text" name="nome" placeholder="es. Ambulanza 1"
+                    class="w-full border rounded-lg p-2 text-sm" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Targa</label>
+                <input type="text" name="targa" placeholder="es. CRI 1234"
+                    class="w-full border rounded-lg p-2 text-sm uppercase" required>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Uso</label>
+                <select name="uso" class="w-full border rounded-lg p-2 text-sm bg-white">
+                    <option value="Soccorso">Soccorso (118)</option>
+                    <option value="Assistenza">Assistenza</option>
+                    <option value="Trasporto">Trasporto</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-blue-700 text-white p-2 rounded-lg font-bold hover:bg-blue-800 shadow-sm">
+                Conferma Inserimento
+            </button>
+        </form>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-800 text-white uppercase text-[11px] font-bold">
+                    <th class="p-4 rounded-tl-lg">ID</th>
+                    <th class="p-4">Nome Mezzo</th>
+                    <th class="p-4">Targa</th>
+                    <th class="p-4">Stato Carico</th>
+                    <th class="p-4">Uso</th>
+                    <th class="p-4 text-center rounded-tr-lg">Azioni</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y border-x border-b">
+                {% for m in mezzi %}
+                <tr class="hover:bg-gray-50 transition">
+                    <form action="{{ url_for('update_mezzo', id=m[0]) }}" method="POST" id="form-{{ m[0] }}">
+                        <td class="p-4 font-mono text-gray-400 text-sm">#{{ m[0] }}</td>
+                        <td class="p-4">
+                            <input type="text" name="nome" value="{{ m[1] }}"
+                                class="border rounded px-2 py-1 w-full text-sm focus:ring-2 focus:ring-blue-300">
+                        </td>
+                        <td class="p-4">
+                            <input type="text" name="targa" value="{{ m[2] or '' }}"
+                                class="border rounded px-2 py-1 w-full font-bold text-blue-700 uppercase text-sm focus:ring-2 focus:ring-blue-300">
+                        </td>
+                        <td class="p-4">
+                            <span
+                                class="px-2 py-1 rounded-full text-[10px] font-bold shadow-sm 
+                                {% if m[6] > 0 %} bg-orange-100 text-orange-700 {% else %} bg-gray-100 text-gray-500 {% endif %}">
+                                {{ m[6]|int }} ARTICOLI
+                            </span>
+                        </td>
+                        <td class="p-4">
+                            <select name="uso" class="border rounded px-2 py-1 w-full bg-white text-sm">
+                                <option value="Soccorso" {% if m[4]=='Soccorso' %}selected{% endif %}>Soccorso</option>
+                                <option value="Assistenza" {% if m[4]=='Assistenza' %}selected{% endif %}>Assistenza
+                                </option>
+                                <option value="Trasporto" {% if m[4]=='Trasporto' %}selected{% endif %}>Trasporto
+                                </option>
+                            </select>
+                        </td>
+                        <td class="p-4 flex justify-center gap-2">
+                            <button type="submit"
+                                class="bg-green-100 text-green-700 p-2 rounded-lg hover:bg-green-200 transition"
+                                title="Salva modifiche">
+                                <i class="fas fa-save"></i>
+                            </button>
+                    </form>
+
+                    <form action="{{ url_for('scarica_tutto_mezzo', id=m[0]) }}" method="POST"
+                        onsubmit="return confirm('ATTENZIONE: Vuoi riportare TUTTI i prodotti di questo mezzo in magazzino?')">
+                        <button type="submit"
+                            class="bg-blue-100 text-blue-600 p-2 rounded-lg hover:bg-blue-200 transition"
+                            title="Scarica tutto nel magazzino centrale">
+                            <i class="fas fa-box-open"></i>
+                        </button>
+                    </form>
+
+                    <form action="{{ url_for('elimina_mezzo', id=m[0]) }}" method="POST"
+                        onsubmit="return confirm('Sei sicuro? Questa azione eliminerà definitivamente il mezzo!')">
+                        <button type="submit" class="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 transition"
+                            title="Elimina mezzo">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    function toggleNuovoMezzo() {
+        const form = document.getElementById('form-nuovo-mezzo');
+        form.classList.toggle('hidden');
+    }
+</script>
+{% endblock %}

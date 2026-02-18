@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mx-auto p-4">
+    <div class="bg-gray-300 p-4 rounded-xl shadow-sm border border-gray-100 mb-8">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+
+            <div class="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                <a href="{{ url_for('lista_ambulanze' if mezzo[2] in ['Soccorso', 'Assistenza'] else 'lista_trasporto') }}"
+                    class="p-2.5 bg-gray-50 hover:bg-gray-200 text-gray-600 rounded-full transition-all group"
+                    title="Torna indietro">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </a>
+                <div class="text-center sm:text-left">
+                    <div class="flex items-center gap-2 justify-center sm:justify-start">
+                        <span class="text-2xl">📋</span>
+                        <h1 class="text-2xl font-black text-gray-800 tracking-tight">
+                            Checklist <span class="text-blue-600">{{ mezzo[0] }}</span>
+                        </h1>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1 justify-center sm:justify-start">
+                        <span
+                            class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full uppercase tracking-wider">
+                            {{ mezzo[2] }}
+                        </span>
+                        <span class="text-gray-400 text-xs">•</span>
+                        <span class="text-gray-600 text-sm font-medium">Gestione Dotazione Bordo</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cerca presidio..."
+                        class="block w-full pl-10 pr-4 py-2.5 border-none bg-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none text-sm text-gray-800">
+                </div>
+
+                {% if session.get('ruolo') == 'Amministratore' %}
+                <div class="flex gap-2">
+                    <form action="{{ url_for('ripristina_mezzo', mezzo_id=mezzo_id) }}" method="POST"
+                        class="flex-grow sm:flex-grow-0">
+                        <button type="submit"
+                            class="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-sm shadow-emerald-200 transition-all active:scale-95 whitespace-nowrap text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Ripristina Standard
+                        </button>
+                    </form>
+
+                    <a href="{{ url_for('imposta_standard', mezzo_id=mezzo_id) }}"
+                        class="bg-white hover:bg-gray-50 text-gray-600 p-2.5 rounded-xl transition-all border border-gray-200 shadow-sm flex items-center justify-center group"
+                        title="Configura Standard">
+                        <svg class="w-5 h-5 group-rotate-90 transition-transform duration-500" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white shadow-xl rounded-xl overflow-hidden border border-gray-200">
+        <table class="w-full text-left border-collapse" id="checklistTable">
+            <thead class="bg-gray-50 text-xs text-gray-600 uppercase font-semibold">
+                <tr>
+                    <th class="p-4 border-b">Prodotto</th>
+                    <th class="p-4 text-center border-b">Scadenza</th>
+                    <th class="p-4 text-center border-b">Giacenza / Standard</th>
+                    <th class="p-4 text-right border-b">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in prodotti %}
+                <tr class="border-b hover:bg-blue-50 transition product-row">
+                    <td class="p-4">
+                        <div class="font-bold text-gray-800 product-name">{{ p[0] }}</div>
+                    </td>
+                    <td class="p-4 text-center">
+                        {% if p[4] %}
+                        <span
+                            class="px-2 py-1 rounded-md font-mono text-sm {{ 'bg-red-100 text-red-700 font-bold animate-pulse' if p[4].strftime('%Y-%m-%d') <= current_date_plus_30 else 'bg-gray-100 text-gray-700' }}">
+                            {{ p[4].strftime('%d/%m/%Y') }}
+                        </span>
+                        {% else %}
+                        <span class="text-gray-400 italic text-xs">Nessun lotto</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="text-lg font-bold {{ 'text-red-600' if p[1] < p[2] else 'text-green-600' }}">
+                            {{ p[1] }}
+                        </span>
+                        <span class="text-gray-400 font-normal"> / {{ p[2] }}</span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <div class="flex justify-end items-center gap-3">
+                            {% if session.get('ruolo') == 'Amministratore' %}
+                            <form action="{{ url_for('elimina_standard', mezzo_id=mezzo_id, prodotto_id=p[3]) }}"
+                                method="POST"
+                                onsubmit="return confirm('Vuoi davvero rimuovere {{ p[0] }} dalla dotazione fissa di questo mezzo?');"
+                                class="mr-2">
+                                <button type="submit" class="text-red-400 hover:text-red-600 transition-colors p-1"
+                                    title="Elimina Prodotto">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </form>
+                            {% endif %}
+
+                            <div class="flex gap-2">
+                                <button onclick="updateQta('{{ mezzo_id }}', '{{ p[3] }}', 1, 'carica')"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90">
+                                    <span class="text-2xl font-black leading-none">+</span>
+                                </button>
+
+                                <button onclick="updateQta('{{ mezzo_id }}', '{{ p[3] }}', 1, 'scarica')"
+                                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 w-10 h-10 rounded-full flex items-center justify-center shadow-sm transition-all active:scale-90 border border-gray-300">
+                                    <span class="text-2xl font-black leading-none">−</span>
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div id="noResults" class="hidden p-10 text-center text-gray-500">
+            Nessun prodotto corrisponde alla ricerca.
+        </div>
+    </div>
+</div>
+
+<script>
+    function filterTable() {
+        const input = document.getElementById("searchInput");
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById("checklistTable");
+        const rows = table.getElementsByClassName("product-row");
+        let found = false;
+
+        for (let i = 0; i < rows.length; i++) {
+            const nameColumn = rows[i].getElementsByClassName("product-name")[0];
+            if (nameColumn) {
+                const txtValue = nameColumn.textContent || nameColumn.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    rows[i].style.display = "";
+                    found = true;
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+        document.getElementById("noResults").style.display = found ? "none" : "block";
+    }
+
+    async function updateQta(mId, pId, qta, op) {
+        try {
+            const response = await fetch('/mezzi/aggiorna_scorta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mezzo_id: mId, prodotto_id: pId, quantita: qta, operazione: op })
+            });
+            if (response.ok) { location.reload(); }
+            else {
+                const err = await response.json();
+                alert("Attenzione: " + err.error);
+            }
+        } catch (e) { alert("Errore di connessione al server"); }
+    }
+</script>
+{% endblock %}

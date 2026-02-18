@@ -17,6 +17,8 @@
     <p class="text-3xl font-bold text-green-600">{{ movimenti_oggi }}</p>
   </div>
 
+  {% include "_mezzi_dropdown.html" %}
+
   {% if session.get("ruolo") == "Amministratore" %}
   <div class="bg-white p-3 rounded-xl shadow text-center h-24 flex flex-col justify-center border-b-4 border-blue-500">
     <p class="text-xs text-gray-500 uppercase font-bold">Utenti Attivi</p>
