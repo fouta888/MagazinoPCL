@@ -127,6 +127,7 @@ def login():
 
     return render_template("login.html")
 
+
 # -------- LOGOUT --------
 @app.route("/logout")
 def logout():
@@ -949,31 +950,28 @@ def aggiorna_scorta_mezzo():
             """, (prodotto_id, lotto_id, quantita_variazione, f"Carico su {identificativo_mezzo}"))
 
         elif operazione == "scarica":
+            # Cerchiamo prima se c'è una riga con quantità sufficiente e lotto NOT NULL
             cur.execute("""
                 SELECT id, lotto_id FROM inventario_mezzi 
-                WHERE mezzo_id = %s AND prodotto_id = %s AND quantita >= %s 
-                ORDER BY lotto_id NULLS LAST LIMIT 1
+                WHERE mezzo_id = %s AND prodotto_id = %s AND quantita >= %s AND lotto_id IS NOT NULL
+                ORDER BY lotto_id ASC LIMIT 1
             """, (mezzo_id, prodotto_id, quantita_variazione))
             riga = cur.fetchone()
             
+            # Se non la troviamo, cerchiamo la riga "generica" (lotto NULL)
+            if not riga:
+                cur.execute("""
+                    SELECT id, lotto_id FROM inventario_mezzi 
+                    WHERE mezzo_id = %s AND prodotto_id = %s AND quantita >= %s AND lotto_id IS NULL
+                    LIMIT 1
+                """, (mezzo_id, prodotto_id, quantita_variazione))
+                riga = cur.fetchone()
+
             if not riga:
                 return jsonify({"error": "Quantità insufficiente sul mezzo"}), 400
             
             inv_id, lotto_id_da_mezzo = riga
             cur.execute("UPDATE inventario_mezzi SET quantita = quantita - %s WHERE id = %s", (quantita_variazione, inv_id))
-            
-            target_lotto = lotto_id_da_mezzo
-            if not target_lotto:
-                cur.execute("SELECT id FROM lotti WHERE prodotto_id = %s ORDER BY id DESC LIMIT 1", (prodotto_id,))
-                target_lotto = cur.fetchone()[0]
-
-            cur.execute("UPDATE lotti SET quantita = quantita + %s WHERE id = %s", (quantita_variazione, target_lotto))
-
-            # LOG: Scarico da Targa
-            cur.execute("""
-                INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, dettaglio, data_movimento)
-                VALUES (%s, %s, 'entrata', %s, %s, CURRENT_TIMESTAMP)
-            """, (prodotto_id, target_lotto, quantita_variazione, f"Scarico da {identificativo_mezzo}"))
 
         db.commit()
         return jsonify({"success": True})
@@ -1082,10 +1080,11 @@ def ripristina_mezzo(mezzo_id):
     db = get_db()
     cur = db.cursor()
     try:
-        cur.execute("SELECT nome, targa FROM mezzi WHERE id = %s", (mezzo_id,))
-        mezzo = cur.fetchone()
-        targa_log = mezzo[1] if mezzo[1] else mezzo[0]
+        cur.execute("SELECT nome FROM mezzi WHERE id = %s", (mezzo_id,))
+        nome_mezzo = cur.fetchone()[0]
 
+        # 1. Trova i prodotti che mancano rispetto allo standard
+        # NOTA: Calcoliamo il mancante sulla somma totale di quel prodotto nel mezzo
         cur.execute("""
             SELECT prodotto_id, (MAX(quantita_standard) - SUM(quantita)) as da_ripristinare 
             FROM inventario_mezzi 
@@ -1096,6 +1095,7 @@ def ripristina_mezzo(mezzo_id):
         mancanti = cur.fetchall()
 
         for p_id, qta_da_aggiungere in mancanti:
+            # 2. Trova il lotto più vecchio in magazzino (FIFO)
             cur.execute("""
                 SELECT id FROM lotti 
                 WHERE prodotto_id = %s AND quantita >= %s 
@@ -1105,8 +1105,12 @@ def ripristina_mezzo(mezzo_id):
 
             if lotto:
                 lotto_id = lotto[0]
-                cur.execute("UPDATE lotti SET quantita = quantita - %s WHERE id = %s", (qta_da_aggiungere, lotto_id))
                 
+                # A. Sottrai dal magazzino
+                cur.execute("UPDATE lotti SET quantita = quantita - %s WHERE id = %s", 
+                           (qta_da_aggiungere, lotto_id))
+                
+                # B. Aggiungi al mezzo (Gestione sicura del lotto)
                 cur.execute("""
                     INSERT INTO inventario_mezzi (mezzo_id, prodotto_id, lotto_id, quantita, quantita_standard)
                     VALUES (%s, %s, %s, %s, 0)
@@ -1114,17 +1118,17 @@ def ripristina_mezzo(mezzo_id):
                     DO UPDATE SET quantita = inventario_mezzi.quantita + EXCLUDED.quantita
                 """, (mezzo_id, p_id, lotto_id, qta_da_aggiungere))
                 
-                # LOG: Ripristino con Targa
+                # C. REGISTRA MOVIMENTO nei log con il nuovo dettaglio
                 cur.execute("""
                     INSERT INTO movimenti (prodotto_id, lotto_id, tipo_movimento, quantita, dettaglio, data_movimento)
                     VALUES (%s, %s, 'uscita', %s, %s, CURRENT_TIMESTAMP)
-                """, (p_id, lotto_id, qta_da_aggiungere, f"Ripristino standard: {targa_log}"))
+                """, (p_id, lotto_id, qta_da_aggiungere, f"Ripristino standard su {nome_mezzo}"))
 
         db.commit()
-        flash(f"Mezzo {targa_log} ripristinato e movimenti registrati!", "success")
+        flash(f"Mezzo {nome_mezzo} ripristinato e movimenti registrati!", "success")
     except Exception as e:
         db.rollback()
-        flash(f"Errore: {str(e)}", "danger")
+        flash(f"Errore durante il ripristino: {str(e)}", "danger")
     finally:
         db.close()
     return redirect(url_for('checklist_mezzo', mezzo_id=mezzo_id))
@@ -2063,6 +2067,8 @@ def esporta_pdf():
     )
 
 
+from flask import session, request, send_file # Assicurati di avere questi import
+
 @app.route("/admin/esporta-audit-movimenti")
 @login_required
 @ruolo_required("Amministratore")
@@ -2070,78 +2076,98 @@ def esporta_pdf_audit():
     from fpdf import FPDF
     from io import BytesIO
 
-    # 1. Recupero dati dal DB
+    # --- 1. RECUPERO UTENTE DALLA SESSIONE (Sistema Personalizzato) ---
+    username_sessione = session.get("username", "Utente Sconosciuto")
+
+    # --- 2. CATTURA IP E DISPOSITIVO ---
+    if request.headers.getlist("X-Forwarded-For"):
+        ip_reale = request.headers.getlist("X-Forwarded-For")[0]
+    else:
+        ip_reale = request.remote_addr
+    dispositivo = request.headers.get('User-Agent', 'N.D.')
+
+    # --- 3. LOG E RECUPERO DATI ---
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT data_operazione, username, azione, dettaglio FROM log_operazioni ORDER BY data_operazione DESC")
-    logs = cur.fetchall()
-    conn.close()
+    try:
+        # Usiamo username_sessione invece di current_user.username
+        cur.execute("""
+            INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+        """, (username_sessione, "EXPORT_PDF", "Esportazione integrale con MultiCell", ip_reale, dispositivo))
+        
+        cur.execute("SELECT data_operazione, username, azione, dettaglio FROM log_operazioni ORDER BY data_operazione DESC")
+        logs = cur.fetchall()
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return f"Errore Database: {e}"
+    finally:
+        conn.close()
 
-    # 2. Classe PDF con Header automatico e Footer
+    # --- 4. CLASSE PDF ---
     class PDF_Audit(FPDF):
         def header(self):
-            # Titolo Documento
-            self.set_font("Arial", "B", 15)
-            self.set_text_color(0, 0, 0)
-            self.cell(190, 10, "REGISTRO MOVIMENTI MERCE (AUDIT)", ln=True, align="C")
+            self.set_font("Arial", "B", 12)
+            self.cell(0, 10, "REGISTRO ANALITICO OPERAZIONI", ln=True, align="C")
+            self.set_font("Arial", "I", 8)
+            # Utilizziamo la variabile locale username_sessione
+            self.cell(0, 5, f"Operatore: {username_sessione} | IP: {ip_reale}", ln=True, align="C")
             self.ln(5)
             
-            # INTESTAZIONE TABELLA (Si ripete su ogni pagina)
-            self.set_font("Arial", "B", 10)
-            self.set_fill_color(50, 50, 50)  # Grigio scuro
-            self.set_text_color(255, 255, 255) # Testo bianco
-            
+            # Intestazioni colonne
+            self.set_font("Arial", "B", 9)
+            self.set_fill_color(60, 60, 60)
+            self.set_text_color(255, 255, 255)
             self.cell(35, 10, "DATA", 1, 0, "C", True)
             self.cell(25, 10, "UTENTE", 1, 0, "C", True)
-            self.cell(25, 10, "AZIONE", 1, 0, "C", True)
-            self.cell(105, 10, "DETTAGLIO", 1, 1, "C", True)
-            
-            # Reset per i dati
+            self.cell(30, 10, "AZIONE", 1, 0, "C", True)
+            self.cell(100, 10, "DETTAGLIO", 1, 1, "C", True)
             self.set_text_color(0, 0, 0)
-            self.set_font("Arial", "", 9)
 
-        def footer(self):
-            self.set_y(-15)
-            self.set_font("Arial", "I", 8)
-            self.cell(0, 10, f'Pagina {self.page_no()}', 0, 0, 'C')
-
-    # 3. Inizializzazione PDF
     pdf = PDF_Audit()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    pdf.set_font("Arial", "", 8)
 
-    # 4. Ciclo dati con righe alternate
-    fill = False # Variabile per alternare il colore
+    # --- 5. CICLO DATI CON MULTI-CELL ---
+    fill = False
     for row in logs:
         data_f = row[0].strftime('%d/%m/%Y %H:%M') if row[0] else "-"
         utente = str(row[1])
         azione = str(row[2])
-        dettaglio = str(row[3])
+        testo_d = str(row[3]).encode('latin-1', 'replace').decode('latin-1')
+
+        # Calcolo dinamico altezza riga
+        nb_lines = pdf.get_string_width(testo_d) / 100
+        h_riga = 6 * (int(nb_lines) + 1) if len(testo_d) > 0 else 6
+        if h_riga < 7: h_riga = 7
+
+        if pdf.get_y() + h_riga > 275:
+            pdf.add_page()
+
+        if fill: pdf.set_fill_color(245, 245, 245)
+        else: pdf.set_fill_color(255, 255, 255)
+
+        x, y = pdf.get_x(), pdf.get_y()
+
+        pdf.cell(35, h_riga, data_f, 1, 0, "C", True)
+        pdf.cell(25, h_riga, utente, 1, 0, "C", True)
+        pdf.cell(30, h_riga, azione, 1, 0, "C", True)
+
+        # Multi-cella per il dettaglio che va a capo
+        pdf.multi_cell(100, h_riga / (int(nb_lines) + 1) if nb_lines > 0 else h_riga, testo_d, 1, "L", True)
         
-        # Pulizia testo
-        testo_d = dettaglio.encode('latin-1', 'replace').decode('latin-1')
+        pdf.set_xy(x, y + h_riga)
+        fill = not fill
 
-        # Imposta colore di sfondo per la riga alternata
-        if fill:
-            pdf.set_fill_color(240, 240, 240) # Grigio chiarissimo
-        else:
-            pdf.set_fill_color(255, 255, 255) # Bianco
-
-        # Scrittura riga (l'ultimo parametro 'True' attiva il colore di sfondo)
-        pdf.cell(35, 8, data_f, 1, 0, "C", True)
-        pdf.cell(25, 8, utente, 1, 0, "C", True)
-        pdf.cell(25, 8, azione, 1, 0, "C", True)
-        pdf.cell(105, 8, testo_d, 1, 1, "L", True)
-        
-        fill = not fill # Inverte il colore per la riga successiva
-
-    # 5. Ritorno del file
+    # --- 6. OUTPUT ---
     pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
     return send_file(
         BytesIO(pdf_out), 
         mimetype='application/pdf', 
         as_attachment=True, 
-        download_name="audit_movimenti_magazzino.pdf"
+        download_name=f"audit_{username_sessione}.pdf"
     )
 
 
@@ -2303,34 +2329,61 @@ def audit_operazioni():
     return render_template("admin_audit.html", logs=logs_op)
 
 
+from flask import request, render_template, session # Assicurati di includere session
+
 @app.route("/admin/registri")
 @login_required
 @ruolo_required("Amministratore")
 def visualizza_tutti_i_log():
+    # --- 1. RECUPERO UTENTE DALLA SESSIONE (Sistema Personalizzato) ---
+    username_sessione = session.get("username", "Anonimo")
+
     conn = get_db()
     cur = conn.cursor()
 
+    # --- 2. LOGICA IP REALE E DISPOSITIVO ---
+    if request.headers.getlist("X-Forwarded-For"):
+        ip_reale = request.headers.getlist("X-Forwarded-For")[0]
+    else:
+        ip_reale = request.remote_addr
+    
+    dispositivo = request.headers.get('User-Agent', 'N.D.')
+
+    # Manutenzione DB: Assicuriamoci che le colonne esistano
     try:
         cur.execute("ALTER TABLE movimenti ADD COLUMN IF NOT EXISTS dettaglio TEXT;")
+        cur.execute("ALTER TABLE log_operazioni ADD COLUMN IF NOT EXISTS ip_address TEXT;")
+        cur.execute("ALTER TABLE log_operazioni ADD COLUMN IF NOT EXISTS dispositivo TEXT;")
+        
+        # LOG DI ACCESSO: Usiamo username_sessione invece di current_user
+        cur.execute("""
+            INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+        """, (username_sessione, "VISUALIZZAZIONE", "Accesso ai Registri di Sistema", ip_reale, dispositivo))
+        
         conn.commit()
     except Exception as e:
         conn.rollback()
-        print(f"Nota: Colonna già esistente o errore minore: {e}")
+        print(f"Nota: Aggiornamento schema o log accesso: {e}")
     
-    # 1. Log dei Download PDF
+    # 3. Log dei Download PDF
     cur.execute("SELECT username, tipo_report, anno_filtro, data_download FROM log_download ORDER BY data_download DESC LIMIT 50")
     logs_pdf = cur.fetchall()
     
-    # 2. Log delle Operazioni (Login, modifiche utenti, etc.)
-    cur.execute("SELECT username, azione, dettaglio, data_operazione FROM log_operazioni ORDER BY data_operazione DESC LIMIT 50")
+    # 4. Log delle Operazioni (Verifica l'ordine per il template)
+    cur.execute("""
+        SELECT username, azione, dettaglio, data_operazione, ip_address, dispositivo 
+        FROM log_operazioni 
+        ORDER BY data_operazione DESC 
+        LIMIT 100
+    """)
     logs_op = cur.fetchall()
     
-    # 3. Log Archivio Riservato (Azioni sui documenti)
+    # 5. Log Archivio Riservato
     cur.execute("SELECT utente, azione, titolo_documento, data_azione, dettagli FROM log_documenti ORDER BY data_azione DESC LIMIT 50")
     logs_doc = cur.fetchall()
 
-    # 4. Registro Movimenti Mezzi e Magazzino (NEW)
-    # Questa query unisce i nomi dei prodotti per una lettura chiara
+    # 6. Registro Movimenti Mezzi e Magazzino
     cur.execute("""
         SELECT 
             m.data_movimento, 
@@ -2345,27 +2398,34 @@ def visualizza_tutti_i_log():
     """)
     logs_movimenti = cur.fetchall()
 
-    # 5. Dati Archivio Documenti
+    # 7. Dati Archivio Documenti
     cur.execute("""
         SELECT 
             titolo, 
             data_caricamento, 
             caricato_da, 
-            JSON_AGG(nome_file) as lista_file,
-            categoria
+            categoria,
+            STRING_AGG(nome_file::text, ',') as lista_file
         FROM documenti 
         GROUP BY titolo, data_caricamento, caricato_da, categoria 
         ORDER BY data_caricamento DESC
     """)
-    documenti = cur.fetchall()
+    documenti_raw = cur.fetchall()
     
+    documenti_formattati = []
+    for d in documenti_raw:
+        titolo, data, autore, categoria, stringa_file = d
+        lista_file = stringa_file.split(',') if stringa_file else []
+        documenti_formattati.append((titolo, data, autore, lista_file, categoria))
+
     conn.close()
+    
     return render_template("admin_full_logs.html", 
                            logs_pdf=logs_pdf, 
-                           logs_op=logs_op, 
+                           logs_op=logs_op,
                            logs_doc=logs_doc,
                            logs_movimenti=logs_movimenti,
-                           documenti=documenti)
+                           documenti=documenti_formattati)
 
 
 import os
@@ -2429,6 +2489,41 @@ def documenti_view():
     return redirect(url_for('visualizza_tutti_i_log'))
 
 
+@app.route("/documenti/update", methods=["POST"])
+@login_required
+@ruolo_required("Amministratore")
+def update_documento():
+    vecchio_nome = request.form.get("vecchio_nome")  # Il titolo originale
+    nuovo_nome = request.form.get("nuovo_nome")      # Il nuovo titolo
+    nuova_categoria = request.form.get("nuova_categoria")
+
+    db = get_db()
+    cur = db.cursor()
+    try:
+        # Nota: Ho cambiato 'nome' in 'titolo' per corrispondere alla tua tabella
+        cur.execute("""
+            UPDATE documenti 
+            SET titolo = %s, categoria = %s 
+            WHERE titolo = %s
+        """, (nuovo_nome, nuova_categoria, vecchio_nome))
+        
+        # Opzionale: Registra la modifica nei log
+        cur.execute("""
+            INSERT INTO log_documenti (utente, azione, titolo_documento, data_azione)
+            VALUES (%s, %s, %s, %s)
+        """, (session.get("username"), "MODIFICA", f"Rinominato da {vecchio_nome} a {nuovo_nome}", datetime.now()))
+        
+        db.commit()
+        flash(f"Documento '{nuovo_nome}' aggiornato con successo!", "success")
+    except Exception as e:
+        db.rollback()
+        flash(f"Errore durante l'aggiornamento: {e}", "danger")
+    finally:
+        db.close()
+    
+    # CORREZIONE BuildError: Punta alla funzione che carica la pagina
+    return redirect(url_for('visualizza_tutti_i_log'))
+
 
 @app.route("/documenti/elimina_gruppo", methods=["POST"])
 @login_required
@@ -2473,7 +2568,6 @@ def nuovo_prestito():
     cur = conn.cursor()
 
     if request.method == "POST":
-        # Usiamo getlist per recuperare tutti gli ID selezionati dai checkbox
         prodotti_selezionati = request.form.getlist("prodotto_id")
         beneficiario = request.form.get("beneficiario")
         telefono = request.form.get("telefono")
@@ -2483,24 +2577,32 @@ def nuovo_prestito():
 
         if not prodotti_selezionati:
             flash("❌ Errore: Seleziona almeno un oggetto!", "danger")
-            # È fondamentale fare un return anche qui!
             return redirect(url_for('nuovo_prestito'))
 
         try:
-            # Cicliamo su ogni prodotto selezionato
             for p_id in prodotti_selezionati:
                 cur.execute("""
                     INSERT INTO prestiti (prodotto_id, beneficiario, telefono, indirizzo, note, utente_id, stato, data_inizio)
                     VALUES (%s, %s, %s, %s, %s, %s, 'ATTIVO', CURRENT_TIMESTAMP)
                 """, (p_id, beneficiario, telefono, indirizzo, note, utente_id))
                 
-                # Scaliamo la giacenza per ogni oggetto
                 cur.execute("UPDATE prodotti SET quantita = quantita - 1 WHERE id = %s", (p_id,))
+
+            # UNICO LOG CON IP E DISPOSITIVO
+            cur.execute("""
+                INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+            """, (
+                session.get("username"), 
+                "COMODATO NUOVO", 
+                f"Assegnati {len(prodotti_selezionati)} oggetti a {beneficiario}",
+                request.remote_addr,
+                request.user_agent.string[:255]
+            ))
             
             conn.commit()
             flash(f"✅ Registrati {len(prodotti_selezionati)} oggetti per {beneficiario}", "success")
             return redirect(url_for('elenco_prestiti'))
-        
         except Exception as e:
             conn.rollback()
             flash(f"❌ Errore durante il salvataggio: {e}", "danger")
@@ -2508,14 +2610,99 @@ def nuovo_prestito():
         finally:
             conn.close()
 
-    # --- CASO GET (Caricamento pagina) ---
-    # Questa parte deve essere fuori dall'if POST
     cur.execute("SELECT id, nome, quantita FROM prodotti WHERE attivo=TRUE AND quantita > 0 ORDER BY nome")
     prodotti = cur.fetchall()
     conn.close()
-    
-    # Assicurati che questo return sia presente e allineato correttamente
     return render_template("nuovo_prestito.html", prodotti=prodotti)
+
+
+@app.route("/prestiti/elimina/<int:prestito_id>")
+@login_required
+@ruolo_required("Amministratore")
+def elimina_prestito(prestito_id):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT prodotto_id, stato, beneficiario FROM prestiti WHERE id = %s", (prestito_id,))
+        res = cur.fetchone()
+        
+        if res:
+            nome_beneficiario = res[2]
+            if res[1] == 'ATTIVO':
+                cur.execute("UPDATE prodotti SET quantita = quantita + 1 WHERE id = %s", (res[0],))
+
+            cur.execute("DELETE FROM prestiti WHERE id = %s", (prestito_id,))
+
+            # LOG CORRETTO
+            cur.execute("""
+                INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+            """, (
+                session.get("username"), 
+                "COMODATO ELIMINA", 
+                f"Eliminato prestito ID {prestito_id} di {nome_beneficiario}",
+                request.remote_addr,
+                request.user_agent.string[:255]
+            ))
+            conn.commit()
+            flash("✅ Record eliminato e giacenza ripristinata.", "success")
+        else:
+            flash("❌ Prestito non trovato.", "warning")
+            
+    except Exception as e:
+        conn.rollback()
+        flash(f"❌ Errore: {e}", "danger")
+    finally:
+        conn.close()
+    return redirect(url_for('elenco_prestiti'))
+
+
+@app.route("/prestiti/modifica/<int:prestito_id>", methods=["GET", "POST"])
+@login_required
+@ruolo_required("Amministratore")
+def modifica_prestito(prestito_id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        nuovo_beneficiario = request.form.get("beneficiario")
+        nuovo_indirizzo = request.form.get("indirizzo")
+        nuovo_telefono = request.form.get("telefono")
+        nuove_note = request.form.get("note")
+
+        try:
+            cur.execute("SELECT beneficiario, data_inizio FROM prestiti WHERE id = %s", (prestito_id,))
+            vecchio = cur.fetchone()
+
+            cur.execute("""
+                UPDATE prestiti 
+                SET beneficiario = %s, indirizzo = %s, telefono = %s, note = %s
+                WHERE beneficiario = %s AND data_inizio = %s
+            """, (nuovo_beneficiario, nuovo_indirizzo, nuovo_telefono, nuove_note, vecchio[0], vecchio[1]))
+
+            # LOG CORRETTO
+            cur.execute("""
+                INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+            """, (
+                session.get("username"), 
+                "COMODATO MODIFICA", 
+                f"Aggiornati dati per {nuovo_beneficiario} (ID rif: {prestito_id})",
+                request.remote_addr,
+                request.user_agent.string[:255]
+            ))
+
+            conn.commit()
+            flash("✅ Comodato aggiornato con successo", "success")
+            return redirect(url_for('elenco_prestiti'))
+        except Exception as e:
+            conn.rollback()
+            flash(f"❌ Errore: {e}", "danger")
+    
+    cur.execute("SELECT id, beneficiario, indirizzo, telefono, note FROM prestiti WHERE id = %s", (prestito_id,))
+    prestito = cur.fetchone()
+    conn.close()
+    return render_template("modifica_prestito.html", p=prestito)
 
 
 @app.route("/prestiti")
@@ -2545,6 +2732,7 @@ def elenco_prestiti():
     conn.close()
     
     return render_template("elenco_prestiti.html", prestiti=lista_prestiti)
+
 
 
 @app.route("/prestiti/ritorno/<int:prestito_id>")
@@ -2759,6 +2947,12 @@ def esporta_comodato_multiplo(beneficiario):
     pdf_out = pdf.output(dest='S').encode('latin-1', 'replace')
     return send_file(BytesIO(pdf_out), mimetype='application/pdf', as_attachment=False, download_name=f"Riepilogo_{beneficiario}.pdf")
 
+
+def get_client_ip():
+    # Se l'app è dietro Nginx, l'IP reale è nel primo elemento di X-Forwarded-For
+    if request.headers.getlist("X-Forwarded-For"):
+        return request.headers.getlist("X-Forwarded-For")[0]
+    return request.remote_addr
 
 
 @app.context_processor

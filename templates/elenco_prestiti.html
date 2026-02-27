@@ -12,7 +12,7 @@
                 <i class="fas fa-plus"></i> Nuovo
             </a>
             <button id="fifoToggle" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                Mostra solo uscita 
+                Mostra solo uscita
             </button>
         </div>
     </div>
@@ -35,26 +35,40 @@
                     <td class="p-4 text-sm font-bold">
                         {{ p[3] }}
                         <br>
-                        <span class="text-xs text-gray-400 font-normal">{{ p[6] if p[6] else 'Nessun indirizzo' }}</span>
+                        <span class="text-xs text-gray-400 font-normal">{{ p[6] if p[6] else 'Nessun indirizzo'
+                            }}</span>
                     </td>
                     <td class="p-4 text-sm text-gray-600">{{ p[2] }}</td>
                     <td class="p-4">
-                        <span class="stato-badge px-2 py-1 rounded-full text-[10px] font-bold {{ 'bg-green-100 text-green-700' if p[5] == 'ATTIVO' else 'bg-gray-100 text-gray-500' }}">
+                        <span
+                            class="stato-badge px-2 py-1 rounded-full text-[10px] font-bold {{ 'bg-green-100 text-green-700' if p[5] == 'ATTIVO' else 'bg-gray-100 text-gray-500' }}">
                             {{ p[5] }}
                         </span>
                     </td>
                     <td class="p-4">
                         <div class="flex items-center justify-center gap-4">
                             <a href="{{ url_for('esporta_comodato_multiplo', beneficiario=p[3]) }}" target="_blank"
-                                class="text-purple-600 hover:text-purple-800 flex flex-col items-center"
-                                title="Scarica riepilogo completo">
+                                class="text-purple-600 hover:text-purple-800 flex flex-col items-center" title="Stampa">
                                 <i class="fas fa-file-pdf fa-lg"></i>
                                 <span class="text-[9px] uppercase font-bold mt-1">Stampa</span>
                             </a>
 
+                            <a href="{{ url_for('modifica_prestito', prestito_id=p[0]) }}"
+                                class="text-amber-500 hover:text-amber-700 flex flex-col items-center" title="Modifica">
+                                <i class="fas fa-edit fa-lg"></i>
+                                <span class="text-[9px] uppercase font-bold mt-1">Modifica</span>
+                            </a>
+
+                            <a href="{{ url_for('elimina_prestito', prestito_id=p[0]) }}"
+                                onclick="return confirm('Vuoi eliminare definitivamente questo record?')"
+                                class="text-red-500 hover:text-red-700 flex flex-col items-center" title="Elimina">
+                                <i class="fas fa-trash-alt fa-lg"></i>
+                                <span class="text-[9px] uppercase font-bold mt-1">Elimina</span>
+                            </a>
+
                             {% if p[5] == 'ATTIVO' %}
                             <a href="{{ url_for('registra_ritorno', prestito_id=p[0]) }}"
-                                onclick="return confirm('Vuoi segnare come riportati gli oggetti di {{ p[3] }}?')"
+                                onclick="return confirm('Segnare come riportati gli oggetti di {{ p[3] }}?')"
                                 class="text-green-600 hover:text-green-800 flex flex-col items-center">
                                 <i class="fas fa-undo-alt fa-lg"></i>
                                 <span class="text-[9px] uppercase font-bold mt-1">Riporta</span>

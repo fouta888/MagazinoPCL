@@ -3,16 +3,19 @@
 
 <div class="max-w-7xl mx-auto mt-2 p-4">
     <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-        <div class="flex items-center gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-yellow-500 leading-tight">📂 Registri Sistema Completi</h1>
-                <p class="text-xs text-gray-500 font-medium">Monitoraggio movimenti e archivio documentale riservato</p>
-            </div>
+        <div>
+            <h1 class="text-3xl font-bold text-yellow-500 leading-tight">📂 Registri Sistema Completi</h1>
+            <p class="text-xs text-gray-500 font-medium">Monitoraggio movimenti e archivio documentale riservato</p>
         </div>
-        <a href="{{ url_for('esporta_pdf_audit') }}" id="btn-esporta"
-            class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm shadow-md font-bold self-start md:self-center">
-            📄 Esporta Solo Movimenti
-        </a>
+
+        <div class="flex gap-2">
+            <input type="date" id="globalDateFilter" onchange="filterByDate(this.value)"
+                class="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none shadow-sm">
+            <a href="{{ url_for('esporta_pdf_audit') }}" id="btn-esporta"
+                class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm shadow-md font-bold self-start md:self-center">
+                📄 Esporta Solo Movimenti
+            </a>
+        </div>
     </div>
 
     <div class="flex space-x-4 mb-6 border-b overflow-x-auto bg-white p-2 rounded-t-xl">
@@ -28,10 +31,14 @@
             class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-purple-600 whitespace-nowrap flex items-center gap-2 transition-all">
             <i class="fas fa-archive text-xs"></i> Attività Archivio
         </button>
+        <button onclick="switchTab('admin')" id="btn-admin"
+            class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-red-600 whitespace-nowrap flex items-center gap-2 transition-all">
+            <i class="fas fa-user-shield text-xs"></i> Log Admin (IP)
+        </button>
     </div>
 
-    <div id="tab-op" class="bg-white shadow-lg rounded-xl overflow-hidden border">
-        <table class="w-full text-sm text-left">
+    <div id="tab-op" class="tab-content bg-white shadow-lg rounded-xl overflow-hidden border">
+        <table class="w-full text-sm text-left datatable">
             <thead class="bg-gray-800 text-white font-bold uppercase text-[11px]">
                 <tr>
                     <th class="p-4">Data</th>
@@ -55,17 +62,13 @@
                     <td class="p-4 text-center font-mono font-bold">{{ mov[3] }}</td>
                     <td class="p-4 text-xs text-gray-600">{{ mov[4] }}</td>
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="5" class="p-10 text-center text-gray-400 italic">Nessun movimento registrato.</td>
-                </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <div id="tab-pdf" class="hidden bg-white shadow-lg rounded-xl overflow-hidden border">
-        <table class="w-full text-sm text-left">
+    <div id="tab-pdf" class="tab-content hidden bg-white shadow-lg rounded-xl overflow-hidden border">
+        <table class="w-full text-sm text-left datatable">
             <thead class="bg-gray-800 text-white font-bold uppercase text-[11px]">
                 <tr>
                     <th class="p-4">Data</th>
@@ -77,7 +80,8 @@
             <tbody class="divide-y text-gray-700">
                 {% for log in logs_pdf %}
                 <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') if log[3] else
+                        'N.D.' }}</td>
                     <td class="p-4 font-bold text-blue-600">{{ log[0] }}</td>
                     <td class="p-4 uppercase text-xs">{{ log[1] }}</td>
                     <td class="p-4">{{ log[2] or 'Completo' }}</td>
@@ -87,8 +91,7 @@
         </table>
     </div>
 
-    <div id="tab-doc" class="hidden space-y-6 animate-fade-in">
-
+    <div id="tab-doc" class="tab-content hidden space-y-6 animate-fade-in">
         <div
             class="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-purple-100">
             <div class="relative flex-1 w-full">
@@ -97,16 +100,10 @@
                     class="w-full p-2.5 pl-10 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-400 outline-none"
                     onkeyup="filterDocs()">
             </div>
-            <div class="flex gap-2 w-full md:w-auto">
-                <button onclick="toggleCronologia()"
-                    class="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition flex items-center gap-2 justify-center border">
-                    <i class="fas fa-history text-purple-600"></i> Cronologia
-                </button>
-                <button onclick="toggleFormDocumenti()"
-                    class="bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-green-700 transition flex items-center gap-2 justify-center">
-                    <i class="fas fa-file-medical"></i> Nuovo Caricamento
-                </button>
-            </div>
+            <button onclick="toggleFormDocumenti()"
+                class="bg-green-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-green-700 transition flex items-center gap-2 justify-center w-full md:w-auto">
+                <i class="fas fa-file-medical"></i> Nuovo Caricamento
+            </button>
         </div>
 
         <div id="container-crea" class="hidden bg-white p-6 rounded-xl shadow-lg border-t-4 border-green-500 relative">
@@ -118,7 +115,7 @@
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div>
-                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase">Titolo Gruppo</label>
+                    <label class="block text-xs font-black text-gray-500 mb-1 uppercase">Titolo</label>
                     <input type="text" id="titolo_multiplo" class="w-full border rounded-lg p-2 text-sm"
                         placeholder="Es: Registri 2026">
                 </div>
@@ -129,6 +126,8 @@
                         <option value="Fatture">Fatture</option>
                         <option value="Certificazioni">Certificazioni</option>
                         <option value="Lotti">Lotti</option>
+                        <option value="Trasporto">Trasporto</option>
+                        <option value="Antincendio">Antincendio</option>
                     </select>
                 </div>
                 <div>
@@ -159,148 +158,243 @@
                 <i class="fas fa-folder-open text-purple-600"></i> Documenti Disponibili
             </div>
             <table class="w-full text-left" id="docTable">
-                <thead class="bg-gray-100 text-gray-600 uppercase text-[10px] font-bold">
+                <thead class="bg-gray-800 text-white font-bold uppercase text-[11px]">
                     <tr>
-                        <th class="px-6 py-3">Documento / Categoria</th>
-                        <th class="px-6 py-3 text-center">Visualizza</th>
-                        <th class="px-6 py-3">Data</th>
-                        <th class="px-6 py-3 text-center">Azioni</th>
+                        <th class="p-4">Data</th>
+                        <th class="p-4">Titolo e Categoria</th>
+                        <th class="p-4">File Allegati</th>
+                        <th class="p-4">Operatore</th>
+                        <th class="p-4 text-right">Azioni</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y">
+                <tbody class="divide-y divide-gray-100">
                     {% for doc in documenti %}
-                    <tr class="hover:bg-purple-50 transition-colors">
-                        <td class="px-6 py-4">
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="p-4 text-xs text-gray-500 italic">{{ doc[1].strftime('%d/%m/%Y %H:%M') if doc[1] else
+                            '---' }}</td>
+                        <td class="p-4">
                             <div class="font-bold text-gray-800">{{ doc[0] }}</div>
                             <span
-                                class="text-[9px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-black uppercase">{{
-                                doc[4] or 'Generale' }}</span>
+                                class="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full uppercase font-black">{{
+                                doc[4] }}</span>
                         </td>
-                        <td class="px-6 py-4 flex justify-center gap-2">
-                            {% for file in doc[3] %}
-                            <button onclick="gestisciAnteprima(this)"
-                                data-url="{{ url_for('static', filename='uploads/documenti/' + file) }}"
-                                data-ext="{{ file.split('.')[-1].lower() }}"
-                                class="text-red-500 hover:scale-125 transition-transform p-1">
-                                <i class="fas fa-file-pdf text-xl"></i>
-                            </button>
-                            {% endfor %}
+                        <td class="p-4">
+                            <div class="flex flex-wrap gap-2">
+                                {% for file in doc[3] %}
+                                <button onclick="gestisciAnteprima(this)"
+                                    data-url="{{ url_for('static', filename='uploads/documenti/' + file) }}"
+                                    data-ext="{{ file.split('.')[-1].lower() }}"
+                                    class="flex items-center gap-2 bg-white border border-gray-200 p-1.5 px-3 rounded-lg text-xs font-bold hover:shadow-md hover:border-purple-400 transition">
+                                    <i class="fas fa-file-pdf text-red-500"></i>
+                                    <span class="truncate max-w-[150px]">{{ file.split('_')[-1] }}</span>
+                                </button>
+                                {% endfor %}
+                            </div>
                         </td>
-                        <td class="px-6 py-4 text-xs text-gray-500 italic">{{ doc[1].strftime('%d/%m/%Y %H:%M') }}</td>
-                        <td class="px-6 py-4 text-center">
-                            <button onclick="eliminaGruppo('{{ doc[0] }}', '{{ doc[1].isoformat() }}')"
-                                class="text-red-400 hover:text-red-600 transition-colors">
+                        <td class="p-4 text-xs font-bold text-gray-600">{{ doc[2] }}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="eliminaGruppo('{{ doc[0] }}', '{{ doc[1] }}')"
+                                class="text-gray-400 hover:text-red-600 p-2">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
                         </td>
                     </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div id="container-cronologia"
-            class="hidden bg-white shadow-lg rounded-xl overflow-hidden border animate-fade-in">
-            <div class="bg-gray-800 text-white p-3 font-bold text-sm flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <i class="fas fa-history text-gray-400 text-xs"></i> Cronologia Azioni Archivio
-                </div>
-                <button onclick="toggleCronologia()" class="text-gray-400 hover:text-white">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <table class="w-full text-sm text-left">
-                <thead class="bg-purple-50 text-purple-900 text-[10px] uppercase font-black">
+                    {% else %}
                     <tr>
-                        <th class="p-4">Data</th>
-                        <th class="p-4">Utente</th>
-                        <th class="p-4">Azione</th>
-                        <th class="p-4">Documento</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y text-gray-700">
-                    {% for log in logs_doc %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') if log[3] else
-                            'Data N.D.' }}</td>
-                        <td class="p-4 font-bold text-purple-600">{{ log[0] }}</td>
-                        <td class="p-4">
-                            <span class="px-2 py-1 rounded text-[10px] font-bold uppercase 
-                              {% if log[1] == 'ELIMINAZIONE' %}
-                              bg-red-100 text-red-700
-                              {% elif log[1] == 'DOWNLOAD' %}
-                              bg-green-100 text-green-700
-                              {% else %}
-                              bg-blue-100 text-blue-700
-                              {% endif %}">
-                                {{ log[1] }}
-                            </span>
-                        </td>
-                        <td class="p-4 font-medium">{{ log[2] }}</td>
+                        <td colspan="5" class="p-12 text-center text-gray-400 italic">Nessun documento in archivio</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-</div>
 
-<div id="modalPreview" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl">
-        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
-            <h3 class="font-bold text-gray-700 flex items-center gap-2"><i class="fas fa-eye text-blue-500"></i>
-                Anteprima Documento</h3>
-            <button onclick="chiudiAnteprima()" class="text-gray-400 hover:text-red-500 text-2xl">×</button>
-        </div>
-        <div id="previewContent" class="flex-1 overflow-auto bg-gray-200 flex justify-center items-center"></div>
-        <div class="p-3 border-t bg-gray-50 text-center">
-            <button id="btnDownloadModal"
-                class="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-md">
-                <i class="fas fa-download mr-1"></i> Scarica Originale
-            </button>
-        </div>
+    <div id="tab-admin" class="tab-content hidden bg-white shadow-lg rounded-xl overflow-hidden border">
+        <table class="w-full text-sm text-left datatable">
+            <thead class="bg-red-800 text-white font-bold uppercase text-[11px]">
+                <tr>
+                    <th class="p-4">Data</th>
+                    <th class="p-4">Utente / IP</th>
+                    <th class="p-4">Azione</th>
+                    <th class="p-4">Dettaglio / Dispositivo</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y text-gray-700">
+                {% for log in logs_op %}
+                <tr class="hover:bg-red-50">
+                    <td class="p-4 text-gray-500 italic text-xs">{{ log[3].strftime('%d/%m/%Y %H:%M') if log[3] else
+                        'N.D.' }}</td>
+                    <td class="p-4">
+                        <div class="font-bold text-red-600">{{ log[0] }}</div>
+                        <div class="text-[10px] text-gray-400 font-mono italic">{{ log[4] or '0.0.0.0' }}</div>
+                    </td>
+                    <td class="p-4">
+                        <span
+                            class="px-2 py-1 rounded text-[10px] font-bold uppercase {% if 'ELIMINA' in log[1] %} bg-red-100 text-red-700 {% elif 'NUOVO' in log[1] %} bg-green-100 text-green-700 {% else %} bg-blue-100 text-blue-700 {% endif %}">
+                            {{ log[1] }}
+                        </span>
+                    </td>
+                    <td class="p-4">
+                        <div class="text-xs font-bold text-gray-800 mb-1 leading-relaxed">
+                            {{ log[2] }}
+                        </div>
+
+                        <div class="flex flex-wrap gap-1.5 mt-2">
+                            {% if log[5] %}
+                            {# Piccola logica inline per le icone #}
+                            {% set ua = log[5]|lower %}
+                            <span
+                                class="text-[9px] bg-white text-gray-600 px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-gray-300 shadow-sm"
+                                title="{{ log[5] }}">
+                                {% if 'android' in ua or 'iphone' in ua %}
+                                <i class="fas fa-mobile-alt text-blue-500"></i>
+                                {% elif 'windows' in ua %}
+                                <i class="fab fa-windows text-blue-400"></i>
+                                {% elif 'macintosh' in ua %}
+                                <i class="fab fa-apple text-gray-800"></i>
+                                {% else %}
+                                <i class="fas fa-laptop text-gray-400"></i>
+                                {% endif %}
+
+                                {# Mostra il brand/os in modo leggibile #}
+                                <span class="font-medium">
+                                    {% if 'android' in ua %}Android{% elif 'iphone' in ua %}iPhone{% elif 'windows' in
+                                    ua %}Windows{% elif 'macintosh' in ua %}Mac{% else %}Dispositivo{% endif %}
+                                </span>
+
+                                <span class="text-gray-300">|</span>
+
+                                {# Taglia la stringa UA per non rompere il layout #}
+                                <span class="italic">{{ log[5][:30] }}...</span>
+                            </span>
+                            {% endif %}
+
+                            <span
+                                class="text-[9px] bg-red-50 text-red-600 px-2 py-0.5 rounded-md border border-red-100 font-bold">
+                                <i class="fas fa-hashtag text-[8px] opacity-70"></i> EVT-{{ loop.revindex }}
+                            </span>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
+
+<script>
+    function filterByDate(dateStr) {
+        if (!dateStr) return;
+        const formattedDate = dateStr.split('-').reverse().join('/'); // trasforma yyyy-mm-dd in dd/mm/yyyy
+        const tables = document.querySelectorAll('.datatable tbody');
+
+        tables.forEach(tbody => {
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const dateCell = row.cells[0].innerText;
+                row.style.display = dateCell.includes(formattedDate) ? '' : 'none';
+            });
+        });
+    }
+
+</script>
 
 <script>
 
     let fileBuffer = [];
 
-    // --- LOGICA TAB ---
+    // --- LOGICA TAB --// -
     function switchTab(tab) {
-        const sections = { 'op': 'tab-op', 'pdf': 'tab-pdf', 'doc': 'tab-doc' };
-        const buttons = { 'op': 'btn-op', 'pdf': 'btn-pdf', 'doc': 'btn-doc' };
+        const sections = { 'op': 'tab-op', 'pdf': 'tab-pdf', 'doc': 'tab-doc', 'admin': 'tab-admin' };
+        const buttons = { 'op': 'btn-op', 'pdf': 'btn-pdf', 'doc': 'btn-doc', 'admin': 'btn-admin' };
+        // Dentro switchTab(tab)
+        const borderColors = { 'op': 'green-500', 'pdf': 'blue-500', 'doc': 'purple-500', 'admin': 'red-500' };
+        const textColors = { 'op': 'green-600', 'pdf': 'blue-600', 'doc': 'purple-600', 'admin': 'red-600' };
+        const bgColors = { 'op': 'bg-green-600', 'pdf': 'bg-blue-600', 'doc': 'bg-purple-600', 'admin': 'bg-red-800' };
 
-        // Configurazione dinamica dei colori e dei link di esportazione
+        // 1. Configurazione inclusa la tab admin (per evitare il crash)
         const config = {
             'op': { color: 'emerald', text: '📄 Esporta Registro Movimenti', url: "{{ url_for('esporta_pdf_audit') }}" },
             'pdf': { color: 'blue', text: '📄 Esporta Registro Download', url: "{{ url_for('esporta_pdf') }}" },
-            'doc': { color: 'purple', text: '📄 Esporta Log Archivio', url: "{{ url_for('esporta_log_archivio') }}" }
+            'doc': { color: 'purple', text: '📄 Esporta Log Archivio', url: "{{ url_for('esporta_log_archivio') }}" },
+            'admin': { color: 'purple', text: '📄 Esporta Log Admin', url: "#" } // Aggiunto per evitare errore
         };
 
-        // Nascondi tutte le sezioni e resetta i bottoni
-        Object.values(sections).forEach(id => document.getElementById(id).classList.add('hidden'));
-        Object.keys(buttons).forEach(key => {
-            document.getElementById(buttons[key]).className = "py-2 px-4 border-b-2 border-transparent text-gray-400 hover:text-gray-600 font-medium whitespace-nowrap transition-all";
+        // 2. Nascondi tutte le sezioni (con controllo di esistenza)
+        Object.values(sections).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
         });
 
-        // Mostra sezione attiva e colora il bottone
-        document.getElementById(sections[tab]).classList.remove('hidden');
+        // 3. Resetta i bottoni (con controllo di esistenza)
+        Object.keys(buttons).forEach(key => {
+            const btn = document.getElementById(buttons[key]);
+            if (btn) btn.className = "py-2 px-4 border-b-2 border-transparent text-gray-400 hover:text-gray-600 font-medium whitespace-nowrap transition-all";
+        });
+
+        // 4. Mostra sezione attiva
+        const targetSection = document.getElementById(sections[tab]);
+        if (targetSection) targetSection.classList.remove('hidden');
+
+        // 5. Colora il bottone attivo
         const activeBtn = document.getElementById(buttons[tab]);
+        if (activeBtn) {
+            const borderColors = { 'op': 'emerald-500', 'pdf': 'blue-500', 'doc': 'purple-500', 'admin': 'purple-600' };
+            const textColors = { 'op': 'emerald-600', 'pdf': 'blue-600', 'doc': 'purple-600', 'admin': 'purple-700' };
+            activeBtn.className = `py-2 px-4 border-b-2 border-${borderColors[tab]} text-${textColors[tab]} font-bold whitespace-nowrap transition-all`;
+        }
 
-        // Applica colore dinamico al bordo e al testo del tab
-        if (tab === 'op') activeBtn.className = "py-2 px-4 border-b-2 border-emerald-500 text-emerald-600 font-bold whitespace-nowrap transition-all";
-        if (tab === 'pdf') activeBtn.className = "py-2 px-4 border-b-2 border-blue-500 text-blue-600 font-bold whitespace-nowrap transition-all";
-        if (tab === 'doc') activeBtn.className = "py-2 px-4 border-b-2 border-purple-500 text-purple-600 font-bold whitespace-nowrap transition-all";
-
-        // Aggiorna il pulsante di esportazione in alto a destra
+        // 6. Aggiorna il pulsante di esportazione (solo se esiste e se è configurato)
         const btnEsp = document.getElementById('btn-esporta');
-        btnEsp.innerText = config[tab].text;
-        btnEsp.href = config[tab].url;
+        if (btnEsp && config[tab]) {
+            btnEsp.innerText = config[tab].text;
+            btnEsp.href = config[tab].url;
+            const bgColors = { 'op': 'bg-emerald-600', 'pdf': 'bg-blue-600', 'doc': 'bg-purple-600', 'admin': 'bg-gray-800' };
+            btnEsp.className = `${bgColors[tab]} text-white px-4 py-2 rounded-lg hover:opacity-90 transition text-sm shadow-md font-bold self-start md:self-center`;
+        }
+    }
 
-        // Cambia colore al tasto export in base al tab
-        const bgColors = { 'op': 'bg-emerald-600', 'pdf': 'bg-blue-600', 'doc': 'bg-purple-600' };
-        btnEsp.className = `${bgColors[tab]} text-white px-4 py-2 rounded-lg hover:opacity-90 transition text-sm shadow-md font-bold self-start md:self-center`;
+    function uploadTutto() {
+        const titolo = document.getElementById('titolo_multiplo').value;
+        const categoria = document.getElementById('categoria_doc').value;
+        if (!titolo) return alert("Inserisci un titolo");
+        if (fileBuffer.length === 0) return alert("Allega almeno un file");
+
+        const formData = new FormData();
+        formData.append("titolo", titolo);
+        formData.append("categoria", categoria);
+        fileBuffer.forEach(file => formData.append("file_allegato", file));
+
+        const xhr = new XMLHttpRequest();
+
+        // CONTROLLO DI SICUREZZA:
+        const pContainer = document.getElementById('progressContainer');
+        if (pContainer) {
+            pContainer.classList.remove('hidden');
+        }
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                // Altro controllo di sicurezza per la barra
+                const pBar = document.getElementById('progressBar');
+                const pText = document.getElementById('progressPercent');
+                if (pBar) pBar.style.width = percent + "%";
+                if (pText) pText.innerText = percent + "%";
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status === 200) {
+                alert("Caricamento completato con successo!");
+                location.reload();
+            } else {
+                alert("Errore durante l'upload: " + xhr.responseText);
+            }
+        };
+
+        xhr.open("POST", "{{ url_for('documenti_view') }}", true);
+        xhr.send(formData);
     }
 
     // --- LOGICA UI ---
@@ -413,6 +507,29 @@
     function chiudiAnteprima() {
         document.getElementById('modalPreview').classList.add('hidden');
         document.body.style.overflow = 'auto';
+    }
+
+    function apriModalModifica(btn) {
+        const nome = btn.getAttribute('data-nome');
+        const categoria = btn.getAttribute('data-categoria');
+
+        // Popola i campi
+        document.getElementById('edit_vecchio_nome').value = nome;
+        document.getElementById('edit_nuovo_nome').value = nome;
+
+        // Gestione categoria (se non esiste nel select, imposta Generale)
+        const selectCat = document.getElementById('edit_categoria');
+        selectCat.value = categoria || 'Generale';
+
+        // Mostra il modal
+        const modal = document.getElementById('modalModifica');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Blocca scroll
+    }
+
+    function chiudiModal() {
+        document.getElementById('modalModifica').classList.add('hidden');
+        document.body.style.overflow = 'auto'; // Riattiva scroll
     }
 
     function eliminaGruppo(titolo, dataISO) {
