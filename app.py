@@ -2620,6 +2620,10 @@ def nuovo_prestito():
 @login_required
 @ruolo_required("Amministratore")
 def elimina_prestito(prestito_id):
+    # --- LOGICA IP REALE ---
+    ip_reale = request.headers.getlist("X-Forwarded-For")[0] if request.headers.getlist("X-Forwarded-For") else request.remote_addr
+    dispositivo = request.headers.get('User-Agent', 'N.D.')[:255]
+
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -2628,22 +2632,18 @@ def elimina_prestito(prestito_id):
         
         if res:
             nome_beneficiario = res[2]
+            # Ripristina giacenza se il prestito era ancora attivo
             if res[1] == 'ATTIVO':
                 cur.execute("UPDATE prodotti SET quantita = quantita + 1 WHERE id = %s", (res[0],))
 
             cur.execute("DELETE FROM prestiti WHERE id = %s", (prestito_id,))
 
-            # LOG CORRETTO
+            # LOG CON IP REALE
             cur.execute("""
                 INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
                 VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
-            """, (
-                session.get("username"), 
-                "COMODATO ELIMINA", 
-                f"Eliminato prestito ID {prestito_id} di {nome_beneficiario}",
-                request.remote_addr,
-                request.user_agent.string[:255]
-            ))
+            """, (session.get("username"), "COMODATO ELIMINA", f"Eliminato prestito ID {prestito_id} di {nome_beneficiario}", ip_reale, dispositivo))
+            
             conn.commit()
             flash("✅ Record eliminato e giacenza ripristinata.", "success")
         else:
@@ -2656,11 +2656,14 @@ def elimina_prestito(prestito_id):
         conn.close()
     return redirect(url_for('elenco_prestiti'))
 
-
 @app.route("/prestiti/modifica/<int:prestito_id>", methods=["GET", "POST"])
 @login_required
 @ruolo_required("Amministratore")
 def modifica_prestito(prestito_id):
+    # --- LOGICA IP REALE ---
+    ip_reale = request.headers.getlist("X-Forwarded-For")[0] if request.headers.getlist("X-Forwarded-For") else request.remote_addr
+    dispositivo = request.headers.get('User-Agent', 'N.D.')[:255]
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -2671,30 +2674,26 @@ def modifica_prestito(prestito_id):
         nuove_note = request.form.get("note")
 
         try:
-            cur.execute("SELECT beneficiario, data_inizio FROM prestiti WHERE id = %s", (prestito_id,))
+            # Recuperiamo i dati vecchi per il log o per la clausola WHERE se necessaria
+            cur.execute("SELECT beneficiario FROM prestiti WHERE id = %s", (prestito_id,))
             vecchio = cur.fetchone()
 
-            cur.execute("""
-                UPDATE prestiti 
-                SET beneficiario = %s, indirizzo = %s, telefono = %s, note = %s
-                WHERE beneficiario = %s AND data_inizio = %s
-            """, (nuovo_beneficiario, nuovo_indirizzo, nuovo_telefono, nuove_note, vecchio[0], vecchio[1]))
+            if vecchio:
+                cur.execute("""
+                    UPDATE prestiti 
+                    SET beneficiario = %s, indirizzo = %s, telefono = %s, note = %s
+                    WHERE id = %s
+                """, (nuovo_beneficiario, nuovo_indirizzo, nuovo_telefono, nuove_note, prestito_id))
 
-            # LOG CORRETTO
-            cur.execute("""
-                INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
-                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
-            """, (
-                session.get("username"), 
-                "COMODATO MODIFICA", 
-                f"Aggiornati dati per {nuovo_beneficiario} (ID rif: {prestito_id})",
-                request.remote_addr,
-                request.user_agent.string[:255]
-            ))
+                # LOG CON IP REALE
+                cur.execute("""
+                    INSERT INTO log_operazioni (username, azione, dettaglio, data_operazione, ip_address, dispositivo)
+                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s)
+                """, (session.get("username"), "COMODATO MODIFICA", f"Aggiornati dati per {nuovo_beneficiario} (ID: {prestito_id})", ip_reale, dispositivo))
 
-            conn.commit()
-            flash("✅ Comodato aggiornato con successo", "success")
-            return redirect(url_for('elenco_prestiti'))
+                conn.commit()
+                flash("✅ Comodato aggiornato con successo", "success")
+                return redirect(url_for('elenco_prestiti'))
         except Exception as e:
             conn.rollback()
             flash(f"❌ Errore: {e}", "danger")
@@ -2703,7 +2702,6 @@ def modifica_prestito(prestito_id):
     prestito = cur.fetchone()
     conn.close()
     return render_template("modifica_prestito.html", p=prestito)
-
 
 @app.route("/prestiti")
 @login_required
